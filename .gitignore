@@ -1,3 +1,4 @@
 .env
 .specstory
 /test/milvus/models/
+docs
