@@ -1,12 +1,31 @@
 import json
 import logging
-from typing import AsyncGenerator, List, Dict
+import re
+import time
+import uuid
+from typing import AsyncGenerator, List, Dict, Optional
 
 from openai import AsyncOpenAI
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
-from config_settings import DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, MODEL_NAME
+from config_settings import (
+    CHAT_LOG_FULL_MESSAGES,
+    CHAT_LOG_STREAM_CHUNKS,
+    CHAT_LOG_TRUNCATE_CHARS,
+    DASHSCOPE_API_KEY,
+    DASHSCOPE_BASE_URL,
+    MODEL_NAME,
+    RAG_DIRECT_ANSWER_ENABLED,
+    RAG_DIRECT_ANSWER_INCLUDE_SOURCE,
+    RAG_DIRECT_ANSWER_LEXICAL,
+    RAG_DIRECT_ANSWER_MARGIN,
+    RAG_DIRECT_ANSWER_SCORE,
+)
+from services.milvus_retriever import RetrievedPassage, inject_retrieval_context
 from tools.weather_tool import get_wether
+
+logger = logging.getLogger(__name__)
+ANSWER_PATTERN = re.compile(r"(?:^|\n)\s*答案：", re.MULTILINE)
 
 # 创建异步 OpenAI 客户端（兼容阿里云百炼）
 client = AsyncOpenAI(
@@ -23,34 +42,182 @@ AVAILABLE_TOOLS = {
 TOOLS_SCHEMA = [convert_to_openai_tool(get_wether)]
 
 
+def _truncate(text: str, max_len: int = 500) -> str:
+    if CHAT_LOG_TRUNCATE_CHARS <= 0:
+        return text
+    max_len = CHAT_LOG_TRUNCATE_CHARS
+    if len(text) <= max_len:
+        return text
+    return f"{text[:max_len]}...(truncated)"
+
+
+def _log_messages(prefix: str, messages: List[Dict[str, str]]) -> None:
+    if not CHAT_LOG_FULL_MESSAGES:
+        return
+    logger.info("%s | count=%s", prefix, len(messages))
+    for idx, msg in enumerate(messages, start=1):
+        role = msg.get("role")
+        content = _truncate(str(msg.get("content", "")).replace("\n", "\\n"))
+        logger.info("消息[%s] | role=%s | content=%s", idx, role, content)
+
+
+def _extract_answer_from_passage_text(text: str) -> str:
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+    match = ANSWER_PATTERN.search(raw)
+    if match:
+        return raw[match.end():].strip()
+    return raw
+
+
+def should_use_direct_answer(
+    passages: List[RetrievedPassage],
+    min_score: float,
+    min_lexical: float,
+    min_margin: float,
+) -> bool:
+    if not passages:
+        return False
+    top1 = passages[0]
+    top2 = passages[1] if len(passages) > 1 else None
+    margin = top1.score - top2.score if top2 else 1.0
+    if top1.score < min_score:
+        return False
+    if top1.lexical_score < min_lexical:
+        return False
+    if margin < min_margin:
+        return False
+    return True
+
+
+def select_direct_answer(passages: List[RetrievedPassage]) -> Optional[str]:
+    if not RAG_DIRECT_ANSWER_ENABLED:
+        return None
+    if not should_use_direct_answer(
+        passages=passages,
+        min_score=RAG_DIRECT_ANSWER_SCORE,
+        min_lexical=RAG_DIRECT_ANSWER_LEXICAL,
+        min_margin=RAG_DIRECT_ANSWER_MARGIN,
+    ):
+        return None
+    answer = _extract_answer_from_passage_text(passages[0].text)
+    return answer or None
+
+
+def build_direct_answer_content(answer: str, passage: RetrievedPassage) -> str:
+    if not RAG_DIRECT_ANSWER_INCLUDE_SOURCE:
+        return answer
+
+    details: List[str] = []
+    if passage.question:
+        details.append(f"- 命中问题：{passage.question}")
+    if passage.source:
+        details.append(f"- 来源：{passage.source}")
+    details.append(f"- 置信度：{passage.score:.4f}")
+
+    if not details:
+        return answer
+    return f"{answer}\n\n---\n**知识库命中信息**\n" + "\n".join(details)
+
+
 async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> AsyncGenerator[str, None]:
     """
     流式调用阿里云百炼大模型，支持 tool calling，逐步返回 SSE 格式数据。
     """
+    request_id = str(uuid.uuid4())[:8]
+    started_at = time.perf_counter()
     use_model = model or MODEL_NAME
+    logger.info(
+        "Chat 开始 | req_id=%s | model=%s | input_messages=%s",
+        request_id,
+        use_model,
+        len(messages),
+    )
+    _log_messages(f"Chat 输入消息 | req_id={request_id}", list(messages))
+
     # 复制一份 messages，避免修改原始数据
+    rag_started_at = time.perf_counter()
     conversation = list(messages)
+    conversation, passages = await inject_retrieval_context(conversation)
+    rag_cost_ms = (time.perf_counter() - rag_started_at) * 1000
+    if passages:
+        logger.info(
+            "Chat RAG 命中 | req_id=%s | passages=%s | rag_elapsed=%.2fms",
+            request_id,
+            len(passages),
+            rag_cost_ms,
+        )
+    else:
+        logger.info("Chat RAG 命中为空 | req_id=%s | rag_elapsed=%.2fms", request_id, rag_cost_ms)
+    _log_messages(f"Chat 注入后消息 | req_id={request_id}", conversation)
+
+    direct_answer = select_direct_answer(passages)
+    if direct_answer:
+        direct_content = build_direct_answer_content(direct_answer, passages[0])
+        logger.info(
+            "RAG 直出触发 | req_id=%s | score=%.4f | lexical=%.4f | source=%s",
+            request_id,
+            passages[0].score,
+            passages[0].lexical_score,
+            passages[0].source,
+        )
+        data = json.dumps({"content": direct_content}, ensure_ascii=False)
+        yield f"data: {data}\n\n"
+        total_cost_ms = (time.perf_counter() - started_at) * 1000
+        logger.info(
+            "Chat 结束 | req_id=%s | finish_reason=rag_direct_answer | rag_elapsed=%.2fms | tool_elapsed=0.00ms | total_elapsed=%.2fms",
+            request_id,
+            rag_cost_ms,
+            total_cost_ms,
+        )
+        yield f"data: {json.dumps({'done': True})}\n\n"
+        return
 
     try:
         # 最多循环几轮工具调用，防止无限循环
         max_tool_rounds = 5
+        accumulated_tool_cost_ms = 0.0
 
-        for _ in range(max_tool_rounds):
+        for round_idx in range(1, max_tool_rounds + 1):
+            round_started_at = time.perf_counter()
+            logger.info(
+                "LLM 调用开始 | req_id=%s | round=%s | model=%s | messages=%s | tools=%s",
+                request_id,
+                round_idx,
+                use_model,
+                len(conversation),
+                [tool["function"]["name"] for tool in TOOLS_SCHEMA],
+            )
+            api_started_at = time.perf_counter()
             response = await client.chat.completions.create(
                 model=use_model,
                 tools=TOOLS_SCHEMA,
                 messages=conversation,
                 stream=True,
             )
+            api_call_cost_ms = (time.perf_counter() - api_started_at) * 1000
+            logger.info(
+                "LLM 请求已建立流 | req_id=%s | round=%s | api_elapsed=%.2fms",
+                request_id,
+                round_idx,
+                api_call_cost_ms,
+            )
 
             # 用于累积本轮流式返回的内容和 tool_calls
             full_content = ""
             tool_calls_map = {}  # index -> {id, function_name, arguments_str}
             finish_reason = None
+            chunk_count = 0
+            first_chunk_at = None
 
             async for chunk in response:
                 if not chunk.choices or len(chunk.choices) == 0:
                     continue
+                now = time.perf_counter()
+                chunk_count += 1
+                if first_chunk_at is None:
+                    first_chunk_at = now
 
                 delta = chunk.choices[0].delta
                 finish_reason = chunk.choices[0].finish_reason
@@ -58,6 +225,13 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
                 # 1. 处理普通文本内容 —— 流式推送给前端
                 if delta.content:
                     full_content += delta.content
+                    if CHAT_LOG_STREAM_CHUNKS:
+                        logger.info(
+                            "LLM 流式片段 | req_id=%s | round=%s | content=%s",
+                            request_id,
+                            round_idx,
+                            _truncate(delta.content.replace("\n", "\\n"), 200),
+                        )
                     data = json.dumps({"content": delta.content}, ensure_ascii=False)
                     yield f"data: {data}\n\n"
 
@@ -77,12 +251,37 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
                             tool_calls_map[idx]["function_name"] = tc.function.name
                         if tc.function and tc.function.arguments:
                             tool_calls_map[idx]["arguments"] += tc.function.arguments
+                        if CHAT_LOG_STREAM_CHUNKS:
+                            logger.info(
+                                "LLM 工具流片段 | req_id=%s | round=%s | index=%s | id=%s | name=%s | args_chunk=%s",
+                                request_id,
+                                round_idx,
+                                idx,
+                                tc.id or "",
+                                tc.function.name if tc.function else "",
+                                _truncate(tc.function.arguments if tc.function and tc.function.arguments else "", 200),
+                            )
 
             # ---- 本轮流式结束 ----
+            round_cost_ms = (time.perf_counter() - round_started_at) * 1000
+            ttfb_ms = ((first_chunk_at - round_started_at) * 1000) if first_chunk_at is not None else -1.0
+            stream_cost_ms = ((time.perf_counter() - first_chunk_at) * 1000) if first_chunk_at is not None else 0.0
+            logger.info(
+                "LLM 调用结束 | req_id=%s | round=%s | finish_reason=%s | output_len=%s | tool_calls=%s | chunks=%s | ttfb=%.2fms | stream_elapsed=%.2fms | total_elapsed=%.2fms",
+                request_id,
+                round_idx,
+                finish_reason,
+                len(full_content),
+                len(tool_calls_map),
+                chunk_count,
+                ttfb_ms,
+                stream_cost_ms,
+                round_cost_ms,
+            )
 
             # 如果模型要求调用工具
             if finish_reason == "tool_calls" and tool_calls_map:
-                logging.info(f"模型请求调用工具: {tool_calls_map}")
+                logger.info("模型请求调用工具 | req_id=%s | round=%s | detail=%s", request_id, round_idx, tool_calls_map)
 
                 # 构造 assistant 消息（包含 tool_calls）
                 assistant_tool_calls = []
@@ -108,6 +307,14 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
                 for tc_call in assistant_tool_calls:
                     func_name = tc_call["function"]["name"]
                     func_args = tc_call["function"]["arguments"]
+                    tool_started_at = time.perf_counter()
+                    logger.info(
+                        "工具执行开始 | req_id=%s | round=%s | tool=%s | args=%s",
+                        request_id,
+                        round_idx,
+                        func_name,
+                        _truncate(func_args, 500),
+                    )
                     hint = json.dumps({"content": f"\n\n🔧 正在调用工具 `{func_name}`...\n\n"}, ensure_ascii=False)
                     yield f"data: {hint}\n\n"
 
@@ -118,12 +325,39 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
                             args = json.loads(func_args)
                             # LangChain @tool 装饰的函数，用 .invoke() 调用
                             tool_result = tool_func.invoke(args)
-                            logging.info(f"工具 {func_name} 返回: {tool_result}")
+                            tool_cost_ms = (time.perf_counter() - tool_started_at) * 1000
+                            accumulated_tool_cost_ms += tool_cost_ms
+                            logger.info(
+                                "工具执行成功 | req_id=%s | round=%s | tool=%s | elapsed=%.2fms | result=%s",
+                                request_id,
+                                round_idx,
+                                func_name,
+                                tool_cost_ms,
+                                _truncate(str(tool_result), 500),
+                            )
                         except Exception as e:
                             tool_result = f"工具调用出错: {str(e)}"
-                            logging.error(f"工具 {func_name} 执行失败: {e}")
+                            tool_cost_ms = (time.perf_counter() - tool_started_at) * 1000
+                            accumulated_tool_cost_ms += tool_cost_ms
+                            logger.error(
+                                "工具执行失败 | req_id=%s | round=%s | tool=%s | elapsed=%.2fms | err=%s",
+                                request_id,
+                                round_idx,
+                                func_name,
+                                tool_cost_ms,
+                                e,
+                            )
                     else:
                         tool_result = f"未找到工具: {func_name}"
+                        tool_cost_ms = (time.perf_counter() - tool_started_at) * 1000
+                        accumulated_tool_cost_ms += tool_cost_ms
+                        logger.error(
+                            "工具未找到 | req_id=%s | round=%s | tool=%s | elapsed=%.2fms",
+                            request_id,
+                            round_idx,
+                            func_name,
+                            tool_cost_ms,
+                        )
 
                     # 把工具结果以 tool 角色消息加入对话
                     conversation.append({
@@ -138,10 +372,19 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
             else:
                 # 没有工具调用，正常结束
                 if finish_reason is not None:
+                    total_cost_ms = (time.perf_counter() - started_at) * 1000
+                    logger.info(
+                        "Chat 结束 | req_id=%s | finish_reason=%s | rag_elapsed=%.2fms | tool_elapsed=%.2fms | total_elapsed=%.2fms",
+                        request_id,
+                        finish_reason,
+                        rag_cost_ms,
+                        accumulated_tool_cost_ms,
+                        total_cost_ms,
+                    )
                     yield f"data: {json.dumps({'done': True})}\n\n"
                 break
 
     except Exception as e:
-        logging.error(f"chat_stream 异常: {e}", exc_info=True)
+        logger.error("chat_stream 异常 | req_id=%s | err=%s", request_id, e, exc_info=True)
         error_data = json.dumps({"error": str(e)}, ensure_ascii=False)
         yield f"data: {error_data}\n\n"
