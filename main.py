@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from config.log import init_logging
 from config_settings import LOG_FILE_PATH, LOG_LEVEL, LOG_TO_FILE, SDK_HTTP_DEBUG
 from services.chat_service import chat_stream
+from services.pdf_rag_service import query_pdf_rag
 
 init_logging(
     level=LOG_LEVEL,
@@ -23,6 +24,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 class ChatRequest(BaseModel):
     messages: List[Dict[str, str]]
     model: Optional[str] = None
+
+
+class PdfRagRequest(BaseModel):
+    query: str
+    model: Optional[str] = None
+    top_k: Optional[int] = None
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -46,3 +53,13 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.post("/api/pdf-rag")
+async def pdf_rag(request: PdfRagRequest) -> Dict[str, Any]:
+    result = await query_pdf_rag(
+        query=request.query,
+        model=request.model,
+        top_k=request.top_k,
+    )
+    return {"code": 200, "message": "success", "data": result}

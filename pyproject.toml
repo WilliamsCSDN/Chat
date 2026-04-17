@@ -15,5 +15,6 @@ dependencies = [
     "sentence-transformers<4",
     "numpy<2",
     "torch<2.3",
+    "pypdf>=6.10.0",
 ]
 

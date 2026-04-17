@@ -11,11 +11,20 @@ const stopBtn = document.getElementById('stopBtn');
 const newChatBtn = document.getElementById('newChatBtn');
 const modelSelect = document.getElementById('modelSelect');
 const promptBtns = document.querySelectorAll('.prompt-btn');
+const chatTabs = document.querySelectorAll('.chat-tab');
+const normalTabPanel = document.getElementById('normalTabPanel');
+const pdfTabPanel = document.getElementById('pdfTabPanel');
+const pdfChatMessages = document.getElementById('pdfChatMessages');
+const pdfMessageInput = document.getElementById('pdfMessageInput');
+const pdfSendBtn = document.getElementById('pdfSendBtn');
 
 // ==================== 状态管理 ====================
 let messages = [];           // 对话历史
+let pdfMessages = [];        // PDF-RAG 对话历史
 let isGenerating = false;    // 是否正在生成
 let abortController = null;  // 用于中止请求
+let isPdfGenerating = false; // PDF-RAG 是否正在生成
+let activeTab = 'normal';    // 当前激活 tab
 
 // ==================== 初始化 Marked ====================
 marked.setOptions({
@@ -37,12 +46,24 @@ sendBtn.addEventListener('click', sendMessage);
 // 停止按钮
 stopBtn.addEventListener('click', stopGeneration);
 
+// tab 切换
+chatTabs.forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
 // 新建对话
 newChatBtn.addEventListener('click', () => {
-    messages = [];
-    chatMessages.innerHTML = '';
-    chatMessages.appendChild(createWelcomeScreen());
-    messageInput.focus();
+    if (activeTab === 'normal') {
+        messages = [];
+        chatMessages.innerHTML = '';
+        chatMessages.appendChild(createWelcomeScreen());
+        messageInput.focus();
+        return;
+    }
+    pdfMessages = [];
+    pdfChatMessages.innerHTML = '';
+    pdfChatMessages.appendChild(createPdfWelcomeScreen());
+    pdfMessageInput.focus();
 });
 
 // 快捷提示按钮
@@ -68,6 +89,25 @@ messageInput.addEventListener('input', () => {
     messageInput.style.height = 'auto';
     messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
 });
+
+if (pdfSendBtn) {
+    pdfSendBtn.addEventListener('click', sendPdfMessage);
+}
+
+if (pdfMessageInput) {
+    pdfMessageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (!isPdfGenerating) {
+                sendPdfMessage();
+            }
+        }
+    });
+    pdfMessageInput.addEventListener('input', () => {
+        pdfMessageInput.style.height = 'auto';
+        pdfMessageInput.style.height = Math.min(pdfMessageInput.scrollHeight, 200) + 'px';
+    });
+}
 
 // ==================== 核心函数 ====================
 
@@ -221,6 +261,70 @@ async function generateResponse() {
 }
 
 /**
+ * 发送 PDF-RAG 消息
+ */
+async function sendPdfMessage() {
+    const content = pdfMessageInput.value.trim();
+    if (!content || isPdfGenerating) return;
+
+    const welcome = pdfChatMessages.querySelector('.welcome-screen');
+    if (welcome) {
+        welcome.remove();
+    }
+
+    pdfMessages.push({ role: 'user', content });
+    appendMessage('user', content, pdfChatMessages, 'PDF 用户', '📄');
+    pdfMessageInput.value = '';
+    pdfMessageInput.style.height = 'auto';
+
+    isPdfGenerating = true;
+    pdfSendBtn.disabled = true;
+
+    const aiMessageEl = appendMessage('assistant', '', pdfChatMessages, 'PDF-RAG');
+    const textEl = aiMessageEl.querySelector('.message-text');
+    textEl.innerHTML = `
+        <div class="loading-dots">
+            <span></span><span></span><span></span>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/api/pdf-rag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: content,
+                model: modelSelect.value,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const payload = await response.json();
+        const data = payload.data || {};
+        const answer = data.answer || '未返回回答';
+        const passages = data.passages || [];
+
+        const sourceLines = passages.map((item, idx) => (
+            `- ${idx + 1}. ${item.source || '未知来源'} (score=${Number(item.score || 0).toFixed(4)})`
+        ));
+        const rendered = sourceLines.length > 0
+            ? `${answer}\n\n---\n**检索来源**\n${sourceLines.join('\n')}`
+            : answer;
+        textEl.innerHTML = marked.parse(rendered);
+        pdfMessages.push({ role: 'assistant', content: rendered });
+        scrollToBottom(pdfChatMessages);
+    } catch (error) {
+        textEl.innerHTML = `<span style="color: var(--danger);">PDF-RAG 请求失败：${escapeHtml(error.message)}</span>`;
+    } finally {
+        isPdfGenerating = false;
+        pdfSendBtn.disabled = false;
+    }
+}
+
+/**
  * 停止生成
  */
 function stopGeneration() {
@@ -234,12 +338,12 @@ function stopGeneration() {
 /**
  * 添加消息到界面
  */
-function appendMessage(role, content) {
+function appendMessage(role, content, container = chatMessages, roleNameOverride = null, avatarOverride = null) {
     const messageEl = document.createElement('div');
     messageEl.className = `message ${role}`;
 
-    const avatar = role === 'user' ? 'You' : '🤖';
-    const roleName = role === 'user' ? '你' : '百炼 AI';
+    const avatar = avatarOverride || (role === 'user' ? 'You' : '🤖');
+    const roleName = roleNameOverride || (role === 'user' ? '你' : '百炼 AI');
     const renderedContent = role === 'user' ? escapeHtml(content) : (content ? marked.parse(content) : '');
 
     messageEl.innerHTML = `
@@ -252,8 +356,8 @@ function appendMessage(role, content) {
         </div>
     `;
 
-    chatMessages.appendChild(messageEl);
-    scrollToBottom();
+    container.appendChild(messageEl);
+    scrollToBottom(container);
 
     return messageEl;
 }
@@ -277,9 +381,9 @@ function updateUIState() {
 /**
  * 滚动到底部
  */
-function scrollToBottom() {
+function scrollToBottom(container = chatMessages) {
     requestAnimationFrame(() => {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        container.scrollTop = container.scrollHeight;
     });
 }
 
@@ -320,5 +424,32 @@ function createWelcomeScreen() {
     });
 
     return div;
+}
+
+function createPdfWelcomeScreen() {
+    const div = document.createElement('div');
+    div.className = 'welcome-screen';
+    div.innerHTML = `
+        <div class="welcome-icon">📄</div>
+        <h1>PDF-RAG 对话</h1>
+        <p>输入问题后将基于 kaoqin.pdf 切分后的 Milvus 数据回答</p>
+    `;
+    return div;
+}
+
+function switchTab(tabName) {
+    if (tabName === activeTab) return;
+    activeTab = tabName;
+    chatTabs.forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    const normalActive = tabName === 'normal';
+    normalTabPanel.classList.toggle('active', normalActive);
+    pdfTabPanel.classList.toggle('active', !normalActive);
+    if (normalActive) {
+        messageInput.focus();
+    } else {
+        pdfMessageInput.focus();
+    }
 }
 
