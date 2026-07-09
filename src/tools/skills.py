@@ -8,8 +8,11 @@ from typing import List, Tuple
 from langchain_core.tools import tool
 
 _SKILLS_DIR = Path(__file__).resolve().parent.parent / "skill"
-_CONFIG_RE = re.compile(r"<!--\s*config\s*\n(.*?)\s*-->", re.DOTALL)
-_KEY_VALUE_RE = re.compile(r"(name|description|trigger|milvus_expr|keywords)\s*:\s*(.+)")
+_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
+_CATEGORY_RE = re.compile(r"###\s+(.+?)\s*\n(.*?)(?=\n###|\n##|\Z)", re.DOTALL)
+_DESC_RE = re.compile(r"\*\*描述\*\*[：:]\s*(.+)")
+_KEYWORDS_RE = re.compile(r"\*\*触发关键词\*\*[：:]\s*(.+)")
+_MILVUS_RE = re.compile(r"\*\*Milvus\s*过滤表达式\*\*[：:]\s*(.+)")
 
 
 @dataclass
@@ -23,6 +26,11 @@ class SkillDef:
 
 
 def _parse_skills() -> List[SkillDef]:
+    """解析所有 skill 目录中的 SKILL.md，返回 SkillDef 列表。
+
+    每个 SKILL.md 使用 YAML frontmatter 定义元数据，body 中的 ``## 分类定义``
+    章节列出各知识分类。每个分类生成一个 SkillDef。
+    """
     if not _SKILLS_DIR.is_dir():
         return []
 
@@ -35,32 +43,43 @@ def _parse_skills() -> List[SkillDef]:
             continue
 
         content = skill_md.read_text(encoding="utf-8")
-        config_blocks = _CONFIG_RE.findall(content)
-        for block in config_blocks:
-            skill_name = ""
-            description = ""
-            trigger = ""
-            milvus_expr = ""
+
+        # 提取 YAML frontmatter
+        fm_match = _FRONTMATTER_RE.match(content)
+        if not fm_match:
+            continue
+
+        # 从 frontmatter 之后的正文中提取分类定义
+        body = content[fm_match.end():]
+
+        # 定位到 ## 分类定义 之后的内容
+        category_start = body.find("## 分类定义")
+        if category_start == -1:
+            continue
+        category_body = body[category_start:]
+
+        for m in _CATEGORY_RE.finditer(category_body):
+            category_name = m.group(1).strip()
+            block = m.group(2)
+
+            desc_match = _DESC_RE.search(block)
+            kw_match = _KEYWORDS_RE.search(block)
+            mv_match = _MILVUS_RE.search(block)
+
+            if not (desc_match and mv_match):
+                continue
+
+            description = desc_match.group(1).strip()
+            milvus_expr = mv_match.group(1).strip().strip("`")
             keywords: List[str] = []
-            for line in block.strip().split("\n"):
-                m = _KEY_VALUE_RE.match(line.strip())
-                if not m:
-                    continue
-                key = m.group(1).strip()
-                value = m.group(2).strip()
-                if key == "name":
-                    skill_name = value
-                elif key == "description":
-                    description = value
-                elif key == "trigger":
-                    trigger = value
-                elif key == "milvus_expr":
-                    milvus_expr = value
-                elif key == "keywords":
-                    keywords = [kw.strip() for kw in value.split(",") if kw.strip()]
-            if skill_name and description and milvus_expr:
+            if kw_match:
+                keywords = [kw.strip() for kw in re.split(r"[、,]", kw_match.group(1)) if kw.strip()]
+
+            trigger = f'调用 retrieve_knowledge(query=用户问题, category="{category_name}")'
+
+            if category_name and description and milvus_expr:
                 skills.append(SkillDef(
-                    name=skill_name,
+                    name=category_name,
                     description=description,
                     trigger=trigger,
                     milvus_expr=milvus_expr,

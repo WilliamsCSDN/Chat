@@ -85,7 +85,7 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
     skills_ctx = load_skills_for_context()
     if skills_ctx:
         skill_lines = "\n".join(f"- **{name}**: {desc}" for name, desc in skills_ctx)
-        system_msg = {"role": "system", "content": f"你是百炼AI助手。当用户问题涉及以下领域时，下面是你拥有的技能清单：\n{skill_lines}"}
+        system_msg = {"role": "system", "content": f"你是百炼AI助手。当用户问题涉及以下领域时，下面是你拥有的技能清单：\n{skill_lines}\n 如果你觉得触发了技能，请调用skills_load工具"}
         if conversation and conversation[0]["role"] == "system":
             conversation[0] = system_msg
         else:
