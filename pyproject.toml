@@ -1,0 +1,20 @@
+[project]
+name = "chat"
+version = "0.1.0"
+description = "ali LLM chat"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.115.0",
+    "openai>=1.51.0",
+    "openpyxl>=3.1.5",
+    "python-dotenv==1.0.1",
+    "uvicorn[standard]==0.30.6",
+    "langchain-core>=0.3.0",
+    "pymilvus",
+    "sentence-transformers<4",
+    "numpy<2",
+    "torch<2.3",
+    "pypdf>=6.10.0",
+]
+
