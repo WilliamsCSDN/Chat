@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-from services.milvus_retriever import (
+from src.services import (
     ConfidencePolicy,
     RetrievedPassage,
     build_retrieval_system_message,

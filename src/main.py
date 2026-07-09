@@ -5,10 +5,10 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from config.log import init_logging
-from config_settings import LOG_FILE_PATH, LOG_LEVEL, LOG_TO_FILE, SDK_HTTP_DEBUG
-from services.chat_service import chat_stream
-from services.pdf_rag_service import query_pdf_rag
+from src.config.log import init_logging
+from src.config.config_settings import LOG_FILE_PATH, LOG_LEVEL, LOG_TO_FILE, SDK_HTTP_DEBUG
+from src.services.chat_service import chat_stream
+from src.services.pdf_rag_service import query_pdf_rag
 
 init_logging(
     level=LOG_LEVEL,

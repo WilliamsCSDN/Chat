@@ -2,8 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from services.milvus_retriever import RetrievedPassage
-from services.pdf_rag_service import query_pdf_rag, rerank_pdf_passages
+from src.services import RetrievedPassage
+from src.services import query_pdf_rag, rerank_pdf_passages
 
 
 class PdfRagServiceTests(unittest.IsolatedAsyncioTestCase):

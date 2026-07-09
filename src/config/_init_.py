@@ -2,7 +2,7 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 
-from config_settings import DASHSCOPE_BASE_URL, MODEL_NAME, DASHSCOPE_API_KEY
+from src.config.config_settings import DASHSCOPE_BASE_URL, MODEL_NAME, DASHSCOPE_API_KEY
 
 
 @tool

@@ -4,14 +4,14 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from config_settings import MILVUS_EMBEDDING_MODEL, MILVUS_EMBEDDING_MODEL_PATH
-from services.chat_service import (
+from src.config.config_settings import MILVUS_EMBEDDING_MODEL, MILVUS_EMBEDDING_MODEL_PATH
+from src.services import (
     _extract_answer_from_passage_text,
     build_direct_answer_content,
     chat_stream,
     should_use_direct_answer,
 )
-from services.milvus_retriever import MilvusRetriever, RetrievedPassage
+from src.services import MilvusRetriever, RetrievedPassage
 
 
 class ChatServiceTests(unittest.TestCase):

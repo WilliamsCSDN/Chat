@@ -7,7 +7,7 @@ from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy
 
 from config.log import init_xxx
-from config_settings import DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, MODEL_NAME
+from src.config.config_settings import DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, MODEL_NAME
 
 
 init_xxx()

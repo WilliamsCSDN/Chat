@@ -1,31 +1,25 @@
 import json
+import asyncio
 import logging
-import re
 import time
 import uuid
-from typing import AsyncGenerator, List, Dict, Optional
+from typing import AsyncGenerator, List, Dict
 
 from openai import AsyncOpenAI
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
-from config_settings import (
+from src.config.config_settings import (
     CHAT_LOG_FULL_MESSAGES,
     CHAT_LOG_STREAM_CHUNKS,
     CHAT_LOG_TRUNCATE_CHARS,
     DASHSCOPE_API_KEY,
     DASHSCOPE_BASE_URL,
     MODEL_NAME,
-    RAG_DIRECT_ANSWER_ENABLED,
-    RAG_DIRECT_ANSWER_INCLUDE_SOURCE,
-    RAG_DIRECT_ANSWER_LEXICAL,
-    RAG_DIRECT_ANSWER_MARGIN,
-    RAG_DIRECT_ANSWER_SCORE,
 )
-from services.milvus_retriever import RetrievedPassage, inject_retrieval_context
-from tools.weather_tool import get_wether
+from src.tools.rag_tool import retrieve_knowledge
+from src.tools.weather_tool import get_wether
 
 logger = logging.getLogger(__name__)
-ANSWER_PATTERN = re.compile(r"(?:^|\n)\s*答案：", re.MULTILINE)
 
 # 创建异步 OpenAI 客户端（兼容阿里云百炼）
 client = AsyncOpenAI(
@@ -36,10 +30,11 @@ client = AsyncOpenAI(
 # 注册可用的工具（name -> 实际函数的映射）
 AVAILABLE_TOOLS = {
     "get_wether": get_wether,
+    "retrieve_knowledge": retrieve_knowledge,
 }
 
 # 转换为 OpenAI tools 格式（列表）
-TOOLS_SCHEMA = [convert_to_openai_tool(get_wether)]
+TOOLS_SCHEMA = [convert_to_openai_tool(get_wether), convert_to_openai_tool(retrieve_knowledge)]
 
 
 def _truncate(text: str, max_len: int = 500) -> str:
@@ -61,64 +56,6 @@ def _log_messages(prefix: str, messages: List[Dict[str, str]]) -> None:
         logger.info("消息[%s] | role=%s | content=%s", idx, role, content)
 
 
-def _extract_answer_from_passage_text(text: str) -> str:
-    raw = (text or "").strip()
-    if not raw:
-        return ""
-    match = ANSWER_PATTERN.search(raw)
-    if match:
-        return raw[match.end():].strip()
-    return raw
-
-
-def should_use_direct_answer(
-    passages: List[RetrievedPassage],
-    min_score: float,
-    min_lexical: float,
-    min_margin: float,
-) -> bool:
-    if not passages:
-        return False
-    top1 = passages[0]
-    top2 = passages[1] if len(passages) > 1 else None
-    margin = top1.score - top2.score if top2 else 1.0
-    if top1.score < min_score:
-        return False
-    if top1.lexical_score < min_lexical:
-        return False
-    if margin < min_margin:
-        return False
-    return True
-
-
-def select_direct_answer(passages: List[RetrievedPassage]) -> Optional[str]:
-    if not RAG_DIRECT_ANSWER_ENABLED:
-        return None
-    if not should_use_direct_answer(
-        passages=passages,
-        min_score=RAG_DIRECT_ANSWER_SCORE,
-        min_lexical=RAG_DIRECT_ANSWER_LEXICAL,
-        min_margin=RAG_DIRECT_ANSWER_MARGIN,
-    ):
-        return None
-    answer = _extract_answer_from_passage_text(passages[0].text)
-    return answer or None
-
-
-def build_direct_answer_content(answer: str, passage: RetrievedPassage) -> str:
-    if not RAG_DIRECT_ANSWER_INCLUDE_SOURCE:
-        return answer
-
-    details: List[str] = []
-    if passage.question:
-        details.append(f"- 命中问题：{passage.question}")
-    if passage.source:
-        details.append(f"- 来源：{passage.source}")
-    details.append(f"- 置信度：{passage.score:.4f}")
-
-    if not details:
-        return answer
-    return f"{answer}\n\n---\n**知识库命中信息**\n" + "\n".join(details)
 
 
 async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> AsyncGenerator[str, None]:
@@ -137,42 +74,7 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
     _log_messages(f"Chat 输入消息 | req_id={request_id}", list(messages))
 
     # 复制一份 messages，避免修改原始数据
-    rag_started_at = time.perf_counter()
     conversation = list(messages)
-    conversation, passages = await inject_retrieval_context(conversation)
-    rag_cost_ms = (time.perf_counter() - rag_started_at) * 1000
-    if passages:
-        logger.info(
-            "Chat RAG 命中 | req_id=%s | passages=%s | rag_elapsed=%.2fms",
-            request_id,
-            len(passages),
-            rag_cost_ms,
-        )
-    else:
-        logger.info("Chat RAG 命中为空 | req_id=%s | rag_elapsed=%.2fms", request_id, rag_cost_ms)
-    _log_messages(f"Chat 注入后消息 | req_id={request_id}", conversation)
-
-    direct_answer = select_direct_answer(passages)
-    if direct_answer:
-        direct_content = build_direct_answer_content(direct_answer, passages[0])
-        logger.info(
-            "RAG 直出触发 | req_id=%s | score=%.4f | lexical=%.4f | source=%s",
-            request_id,
-            passages[0].score,
-            passages[0].lexical_score,
-            passages[0].source,
-        )
-        data = json.dumps({"content": direct_content}, ensure_ascii=False)
-        yield f"data: {data}\n\n"
-        total_cost_ms = (time.perf_counter() - started_at) * 1000
-        logger.info(
-            "Chat 结束 | req_id=%s | finish_reason=rag_direct_answer | rag_elapsed=%.2fms | tool_elapsed=0.00ms | total_elapsed=%.2fms",
-            request_id,
-            rag_cost_ms,
-            total_cost_ms,
-        )
-        yield f"data: {json.dumps({'done': True})}\n\n"
-        return
 
     try:
         # 最多循环几轮工具调用，防止无限循环
@@ -324,7 +226,7 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
                         try:
                             args = json.loads(func_args)
                             # LangChain @tool 装饰的函数，用 .invoke() 调用
-                            tool_result = tool_func.invoke(args)
+                            tool_result = await asyncio.to_thread(tool_func.invoke, args)
                             tool_cost_ms = (time.perf_counter() - tool_started_at) * 1000
                             accumulated_tool_cost_ms += tool_cost_ms
                             logger.info(
@@ -374,10 +276,9 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
                 if finish_reason is not None:
                     total_cost_ms = (time.perf_counter() - started_at) * 1000
                     logger.info(
-                        "Chat 结束 | req_id=%s | finish_reason=%s | rag_elapsed=%.2fms | tool_elapsed=%.2fms | total_elapsed=%.2fms",
+                        "Chat 结束 | req_id=%s | finish_reason=%s | tool_elapsed=%.2fms | total_elapsed=%.2fms",
                         request_id,
                         finish_reason,
-                        rag_cost_ms,
                         accumulated_tool_cost_ms,
                         total_cost_ms,
                     )

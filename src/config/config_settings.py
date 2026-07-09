@@ -72,7 +72,7 @@ MILVUS_EMBEDDING_MODEL = os.getenv(
 )
 MILVUS_EMBEDDING_MODEL_PATH = os.getenv(
     "MILVUS_EMBEDDING_MODEL_PATH",
-    "test/milvus/models/paraphrase-multilingual-MiniLM-L12-v2",
+    "../../test/milvus/models/paraphrase-multilingual-MiniLM-L12-v2",
 )
 
 # 日志配置

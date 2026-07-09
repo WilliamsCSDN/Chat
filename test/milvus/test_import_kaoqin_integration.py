@@ -13,8 +13,8 @@ if str(MILVUS_TEST_DIR) not in sys.path:
     sys.path.insert(0, str(MILVUS_TEST_DIR))
 
 import import_kaoqin_pdf as kaoqin_import
-from config_settings import MILVUS_EMBEDDING_MODEL, MILVUS_EMBEDDING_MODEL_PATH
-from services.milvus_retriever import MilvusRetriever
+from src.config.config_settings import MILVUS_EMBEDDING_MODEL, MILVUS_EMBEDDING_MODEL_PATH
+from src.services import MilvusRetriever
 
 
 class KaoqinPdfImportIntegrationTests(unittest.TestCase):

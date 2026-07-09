@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from openai import AsyncOpenAI
 
-from config_settings import (
+from src.config.config_settings import (
     DASHSCOPE_API_KEY,
     DASHSCOPE_BASE_URL,
     MILVUS_EMBEDDING_MODEL,
@@ -29,7 +29,7 @@ from config_settings import (
     PDF_RAG_TOP_K,
     PDF_RAG_VECTOR_FIELD,
 )
-from services.milvus_retriever import (
+from src.services.milvus_retriever import (
     MilvusRetriever,
     RetrievedPassage,
     lexical_overlap_score,

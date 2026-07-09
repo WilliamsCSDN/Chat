@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple
 
-from config_settings import (
+from src.config.config_settings import (
     MILVUS_COLLECTION,
     MILVUS_EMBEDDING_MODEL,
     MILVUS_EMBEDDING_MODEL_PATH,

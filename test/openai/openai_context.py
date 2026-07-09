@@ -1,7 +1,7 @@
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 
-from config_settings import DASHSCOPE_BASE_URL,DASHSCOPE_API_KEY,MODEL_NAME
+from src.config.config_settings import DASHSCOPE_BASE_URL,DASHSCOPE_API_KEY,MODEL_NAME
 
 
 def openaitest():

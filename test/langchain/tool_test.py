@@ -10,8 +10,8 @@ from langchain_openai import ChatOpenAI
 
 from config.log import init_xxx
 from langchain.agents import create_agent
-from config_settings import DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, MODEL_NAME
-from tools.weather_tool import get_wether
+from src.config.config_settings import DASHSCOPE_API_KEY, DASHSCOPE_BASE_URL, MODEL_NAME
+from src.tools.weather_tool import get_wether
 
 
 init_xxx()
