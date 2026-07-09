@@ -17,6 +17,7 @@ from src.config.config_settings import (
     MODEL_NAME,
 )
 from src.tools.rag_tool import retrieve_knowledge
+from src.tools.skills import skills_load, load_skills_for_context
 from src.tools.weather_tool import get_wether
 
 logger = logging.getLogger(__name__)
@@ -31,11 +32,15 @@ client = AsyncOpenAI(
 AVAILABLE_TOOLS = {
     "get_wether": get_wether,
     "retrieve_knowledge": retrieve_knowledge,
+    "skills_load": skills_load,
 }
 
 # 转换为 OpenAI tools 格式（列表）
-TOOLS_SCHEMA = [convert_to_openai_tool(get_wether), convert_to_openai_tool(retrieve_knowledge)]
-
+TOOLS_SCHEMA = [
+    convert_to_openai_tool(get_wether),
+    convert_to_openai_tool(retrieve_knowledge),
+    convert_to_openai_tool(skills_load),
+]
 
 def _truncate(text: str, max_len: int = 500) -> str:
     if CHAT_LOG_TRUNCATE_CHARS <= 0:
@@ -75,6 +80,16 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
 
     # 复制一份 messages，避免修改原始数据
     conversation = list(messages)
+
+    # 注入可用技能列表到系统提示词（仅一次）
+    skills_ctx = load_skills_for_context()
+    if skills_ctx:
+        skill_lines = "\n".join(f"- **{name}**: {desc}" for name, desc in skills_ctx)
+        system_msg = {"role": "system", "content": f"你是百炼AI助手。当用户问题涉及以下领域时，下面是你拥有的技能清单：\n{skill_lines}"}
+        if conversation and conversation[0]["role"] == "system":
+            conversation[0] = system_msg
+        else:
+            conversation.insert(0, system_msg)
 
     try:
         # 最多循环几轮工具调用，防止无限循环

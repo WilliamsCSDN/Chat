@@ -235,7 +235,7 @@ def filter_passages_by_confidence(
 
 
 class RetrieverProtocol(Protocol):
-    def search(self, query: str, top_k: Optional[int] = None) -> List[RetrievedPassage]:
+    def search(self, query: str, top_k: Optional[int] = None, expr: str = "") -> List[RetrievedPassage]:
         ...
 
 
@@ -491,7 +491,7 @@ class MilvusRetriever:
                 sparse_passages = []
         return hits, sparse_passages
 
-    def search(self, query: str, top_k: Optional[int] = None) -> List[RetrievedPassage]:
+    def search(self, query: str, top_k: Optional[int] = None, expr: str = "") -> List[RetrievedPassage]:
         query = (query or "").strip()
         if not query or self._disabled:
             return []
@@ -503,7 +503,7 @@ class MilvusRetriever:
             self.collection_name,
             query,
             limit,
-            self.search_expr or "<empty>",
+            expr or self.search_expr or "<empty>",
         )
         try:
             model = self._get_model()
@@ -533,8 +533,9 @@ class MilvusRetriever:
                 "limit": recall_k,
                 "output_fields": output_fields,
             }
-            if self.search_expr:
-                search_kwargs["expr"] = self.search_expr
+            effective_expr = expr or self.search_expr
+            if effective_expr:
+                search_kwargs["expr"] = effective_expr
 
             sparse_limit = max(self.hybrid_sparse_recall_k, limit * 5)
             self._ensure_sparse_index(collection, output_fields)

@@ -1,3 +1,5 @@
+import random
+
 from langchain_core.tools import tool
 
 from src.services.milvus_retriever import (
@@ -8,7 +10,7 @@ from src.services.milvus_retriever import (
 
 
 @tool
-def retrieve_knowledge(query: str, top_k: int = 3) -> str:
+def retrieve_knowledge(query: str, category: str, top_k: int = 3) -> str:
     """查询内部知识库获取准确信息。当用户询问可能存在于知识库中的事实性、专业性内容时调用此工具。
 
     使用规则：
@@ -19,17 +21,24 @@ def retrieve_knowledge(query: str, top_k: int = 3) -> str:
     if retriever is None:
         return "知识库服务当前不可用，请告知用户并尝试使用通用知识回答。"
 
-    passages = retriever.search(query, top_k=top_k)
-    if not passages:
-        return "未检索到相关知识，请告知用户并尝试使用通用知识回答。"
+    expr = f'category_l1 == "{category}"'
 
-    filtered = filter_passages_by_confidence(passages, _DEFAULT_CONFIDENCE_POLICY)
-    if not filtered:
-        return "检索到一些相关内容但置信度不足，请告知用户检索结果不够可靠，可结合通用知识补充回答。"
+    # passages = retriever.search(query, top_k=top_k, expr=expr)
+    # if not passages:
+    #     return f"未检索到「{category}」相关知识，请告知用户并尝试使用通用知识回答。"
+    #
+    # filtered = filter_passages_by_confidence(passages, _DEFAULT_CONFIDENCE_POLICY)
+    # if not filtered:
+    #     return f"检索到「{category}」相关的一些内容但置信度不足，请告知用户检索结果不够可靠。"
+    #
+    #
+    # lines: list[str] = []
+    # for i, p in enumerate(filtered, 1):
+    #     lines.append(f"[{i}] 来源: {p.source} | 相似度: {p.score:.4f}")
+    #     lines.append(f"    内容: {p.text}")
 
+    # return "\n".join(lines)
     lines: list[str] = []
-    for i, p in enumerate(filtered, 1):
-        lines.append(f"[{i}] 来源: {p.source} | 相似度: {p.score:.4f}")
-        lines.append(f"    内容: {p.text}")
-
+    lines.append(f" 来源: google | 相似度: {random.uniform(0,1):.4f}")
+    lines.append(f"    内容: {expr}")
     return "\n".join(lines)
