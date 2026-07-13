@@ -1,5 +1,5 @@
 /**
- * 百炼大模型对话 - 前端交互逻辑
+ * 百炼大模型对话 - 前端交互逻辑 (AG-UI 协议)
  */
 
 // ==================== DOM 元素 ====================
@@ -19,12 +19,12 @@ const pdfMessageInput = document.getElementById('pdfMessageInput');
 const pdfSendBtn = document.getElementById('pdfSendBtn');
 
 // ==================== 状态管理 ====================
-let messages = [];           // 对话历史
-let pdfMessages = [];        // PDF-RAG 对话历史
-let isGenerating = false;    // 是否正在生成
-let abortController = null;  // 用于中止请求
-let isPdfGenerating = false; // PDF-RAG 是否正在生成
-let activeTab = 'normal';    // 当前激活 tab
+let messages = [];
+let pdfMessages = [];
+let isGenerating = false;
+let abortController = null;
+let isPdfGenerating = false;
+let activeTab = 'normal';
 
 // ==================== 初始化 Marked ====================
 marked.setOptions({
@@ -40,18 +40,13 @@ marked.setOptions({
 
 // ==================== 事件绑定 ====================
 
-// 发送按钮
 sendBtn.addEventListener('click', sendMessage);
-
-// 停止按钮
 stopBtn.addEventListener('click', stopGeneration);
 
-// tab 切换
 chatTabs.forEach((btn) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
-// 新建对话
 newChatBtn.addEventListener('click', () => {
     if (activeTab === 'normal') {
         messages = [];
@@ -66,7 +61,6 @@ newChatBtn.addEventListener('click', () => {
     pdfMessageInput.focus();
 });
 
-// 快捷提示按钮
 promptBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         messageInput.value = btn.dataset.prompt;
@@ -74,7 +68,6 @@ promptBtns.forEach(btn => {
     });
 });
 
-// 输入框：Enter 发送，Shift+Enter 换行
 messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -84,7 +77,6 @@ messageInput.addEventListener('keydown', (e) => {
     }
 });
 
-// 输入框自动调整高度
 messageInput.addEventListener('input', () => {
     messageInput.style.height = 'auto';
     messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
@@ -111,50 +103,37 @@ if (pdfMessageInput) {
 
 // ==================== 核心函数 ====================
 
-/**
- * 发送消息
- */
 async function sendMessage() {
     const content = messageInput.value.trim();
     if (!content || isGenerating) return;
 
-    // 隐藏欢迎页
     const welcome = document.getElementById('welcomeScreen');
     if (welcome) {
         welcome.remove();
     }
 
-    // 添加用户消息
     messages.push({ role: 'user', content });
     appendMessage('user', content);
 
-    // 清空输入框
     messageInput.value = '';
     messageInput.style.height = 'auto';
 
-    // 开始生成
     await generateResponse();
 }
 
 /**
- * 调用后端 API 并流式渲染 AI 回复
+ * 调用后端 /api/chat 并处理 AG-UI 标准 SSE 事件
  */
 async function generateResponse() {
     isGenerating = true;
     updateUIState();
 
-    // 创建 AI 消息容器
     const aiMessageEl = appendMessage('assistant', '');
     const textEl = aiMessageEl.querySelector('.message-text');
+    var lastToolRef = aiMessageEl.querySelector('.message-role'); // 工具调用插入参考点
 
-    // 显示加载动画
-    textEl.innerHTML = `
-        <div class="loading-dots">
-            <span></span><span></span><span></span>
-        </div>
-    `;
+    textEl.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
 
-    let fullContent = '';
     abortController = new AbortController();
 
     try {
@@ -169,88 +148,172 @@ async function generateResponse() {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
-
-        // 清除加载动画
         textEl.innerHTML = '';
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+        // toolCallElements 通过闭包在此函数内共享
+        const toolCallElements = {};
 
-            buffer += decoder.decode(value, { stream: true });
-
-            // 解析 SSE 数据
-            const lines = buffer.split('\n');
-            buffer = lines.pop(); // 保留未完成的行
-
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.slice(6));
-
-                        if (data.error) {
-                            textEl.innerHTML = `<span style="color: var(--danger);">错误：${escapeHtml(data.error)}</span>`;
-                            isGenerating = false;
-                            updateUIState();
-                            return;
-                        }
-
-                        if (data.content) {
-                            fullContent += data.content;
-                            // 使用 Markdown 渲染
-                            textEl.innerHTML = marked.parse(fullContent) + '<span class="typing-cursor"></span>';
-                            // 代码高亮
-                            textEl.querySelectorAll('pre code').forEach(block => {
-                                hljs.highlightElement(block);
-                            });
-                            scrollToBottom();
-                        }
-
-                        if (data.done) {
-                            // 移除打字光标，最终渲染
-                            textEl.innerHTML = marked.parse(fullContent);
-                            textEl.querySelectorAll('pre code').forEach(block => {
-                                hljs.highlightElement(block);
-                            });
-                        }
-                    } catch (e) {
-                        // JSON 解析失败，忽略
+        function handleEvent(data) {
+            switch (data.type) {
+                case 'TEXT_MESSAGE_START':
+                    if (textEl._fullContent) {
+                        textEl._fullContent += '\n';
                     }
+                    break;
+
+                case 'TEXT_MESSAGE_CONTENT':
+                    textEl._fullContent = (textEl._fullContent || '') + data.delta;
+                    textEl.innerHTML = marked.parse(textEl._fullContent) + '<span class="typing-cursor"></span>';
+                    textEl.querySelectorAll('pre code').forEach(function (block) {
+                        hljs.highlightElement(block);
+                    });
+                    scrollToBottom();
+                    break;
+
+                case 'TEXT_MESSAGE_END':
+                    break;
+
+                case 'TOOL_CALL_START':
+                    {
+                        var tcContainer = document.createElement('div');
+                        tcContainer.className = 'tool-call';
+                        tcContainer.innerHTML =
+                            '<div class="tool-call-header" data-tool-id="' + escapeHtml(data.toolCallId) + '">' +
+                                '<span class="tool-call-icon">🔧</span>' +
+                                '<span class="tool-call-name">' + escapeHtml(data.toolCallName) + '</span>' +
+                                '<span class="tool-call-status">执行中...</span>' +
+                                '<span class="tool-call-arrow">▶</span>' +
+                            '</div>' +
+                            '<div class="tool-call-body" style="display:none;">' +
+                                '<div class="tool-call-section">' +
+                                    '<div class="tool-call-section-label">参数</div>' +
+                                    '<div class="tool-call-args"></div>' +
+                                '</div>' +
+                                '<div class="tool-call-section">' +
+                                    '<div class="tool-call-section-label">结果</div>' +
+                                    '<div class="tool-call-result"></div>' +
+                                '</div>' +
+                            '</div>';
+
+                        var header = tcContainer.querySelector('.tool-call-header');
+                        var body = tcContainer.querySelector('.tool-call-body');
+                        header.addEventListener('click', function () {
+                            var isOpen = body.style.display !== 'none';
+                            body.style.display = isOpen ? 'none' : 'block';
+                            header.querySelector('.tool-call-arrow').textContent = isOpen ? '▶' : '▼';
+                        });
+
+                        // 将工具调用插入到角色标签之后，按顺序叠加
+                        lastToolRef.insertAdjacentElement('afterend', tcContainer);
+                        lastToolRef = tcContainer;
+
+                        toolCallElements[data.toolCallId] = {
+                            container: tcContainer,
+                            argsEl: tcContainer.querySelector('.tool-call-args'),
+                            resultEl: tcContainer.querySelector('.tool-call-result'),
+                            statusEl: tcContainer.querySelector('.tool-call-status'),
+                            header: header,
+                            body: body
+                        };
+                    }
+                    break;
+
+                case 'TOOL_CALL_ARGS':
+                    if (toolCallElements[data.toolCallId]) {
+                        var argsEl = toolCallElements[data.toolCallId].argsEl;
+                        argsEl.textContent = (argsEl.textContent || '') + data.delta;
+                    }
+                    break;
+
+                case 'TOOL_CALL_END':
+                    if (toolCallElements[data.toolCallId]) {
+                        var el = toolCallElements[data.toolCallId];
+                        el.statusEl.textContent = '完成';
+                        el.statusEl.classList.add('done');
+                        try {
+                            var parsed = JSON.parse(el.argsEl.textContent);
+                            el.argsEl.innerHTML = '<pre><code>' + escapeHtml(JSON.stringify(parsed, null, 2)) + '</code></pre>';
+                        } catch (e) {
+                            el.argsEl.textContent = el.argsEl.textContent || '(无参数)';
+                        }
+                    }
+                    break;
+
+                case 'TOOL_CALL_RESULT':
+                    if (toolCallElements[data.toolCallId]) {
+                        var el2 = toolCallElements[data.toolCallId];
+                        el2.resultEl.innerHTML = '<pre><code>' + escapeHtml(data.content) + '</code></pre>';
+                        el2.body.style.display = 'block';
+                        el2.header.querySelector('.tool-call-arrow').textContent = '▼';
+                    }
+                    break;
+
+                case 'RUN_STARTED':
+                    break;
+
+                case 'RUN_FINISHED':
+                    if (textEl._fullContent) {
+                        textEl.innerHTML = marked.parse(textEl._fullContent);
+                        textEl.querySelectorAll('pre code').forEach(function (block) {
+                            hljs.highlightElement(block);
+                        });
+                    }
+                    break;
+
+                case 'RUN_ERROR':
+                    textEl._fullContent = null;
+                    textEl.innerHTML = '<span style="color: var(--danger);">错误：' + escapeHtml(data.message) + '</span>';
+                    break;
+            }
+        }
+
+        while (true) {
+            var readResult = await reader.read();
+            if (readResult.done) break;
+
+            buffer += decoder.decode(readResult.value, { stream: true });
+            var lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                if (line.indexOf('data: ') !== 0) continue;
+
+                try {
+                    var data = JSON.parse(line.slice(6));
+                    handleEvent(data);
+                } catch (e) {
+                    console.error('SSE 事件处理失败:', e, line);
                 }
             }
         }
 
-        // 确保最终渲染干净
-        if (fullContent) {
-            textEl.innerHTML = marked.parse(fullContent);
-            textEl.querySelectorAll('pre code').forEach(block => {
+        // 最终渲染
+        if (textEl._fullContent) {
+            textEl.innerHTML = marked.parse(textEl._fullContent);
+            textEl.querySelectorAll('pre code').forEach(function (block) {
                 hljs.highlightElement(block);
             });
         }
 
-        // 保存 AI 回复到对话历史
-        messages.push({ role: 'assistant', content: fullContent });
+        messages.push({ role: 'assistant', content: textEl._fullContent || '' });
 
     } catch (error) {
         if (error.name === 'AbortError') {
-            // 用户主动中止
-            if (fullContent) {
-                textEl.innerHTML = marked.parse(fullContent);
-                textEl.querySelectorAll('pre code').forEach(block => {
-                    hljs.highlightElement(block);
-                });
-                messages.push({ role: 'assistant', content: fullContent });
+            if (textEl._fullContent) {
+                textEl.innerHTML = marked.parse(textEl._fullContent);
+                messages.push({ role: 'assistant', content: textEl._fullContent || '' });
             } else {
                 textEl.innerHTML = '<span style="color: var(--text-muted);">已停止生成</span>';
             }
         } else {
-            textEl.innerHTML = `<span style="color: var(--danger);">请求失败：${escapeHtml(error.message)}</span>`;
+            textEl.innerHTML = '<span style="color: var(--danger);">请求失败：' + escapeHtml(error.message) + '</span>';
         }
     } finally {
         isGenerating = false;
@@ -264,15 +327,15 @@ async function generateResponse() {
  * 发送 PDF-RAG 消息
  */
 async function sendPdfMessage() {
-    const content = pdfMessageInput.value.trim();
+    var content = pdfMessageInput.value.trim();
     if (!content || isPdfGenerating) return;
 
-    const welcome = pdfChatMessages.querySelector('.welcome-screen');
+    var welcome = pdfChatMessages.querySelector('.welcome-screen');
     if (welcome) {
         welcome.remove();
     }
 
-    pdfMessages.push({ role: 'user', content });
+    pdfMessages.push({ role: 'user', content: content });
     appendMessage('user', content, pdfChatMessages, 'PDF 用户', '📄');
     pdfMessageInput.value = '';
     pdfMessageInput.style.height = 'auto';
@@ -280,16 +343,12 @@ async function sendPdfMessage() {
     isPdfGenerating = true;
     pdfSendBtn.disabled = true;
 
-    const aiMessageEl = appendMessage('assistant', '', pdfChatMessages, 'PDF-RAG');
-    const textEl = aiMessageEl.querySelector('.message-text');
-    textEl.innerHTML = `
-        <div class="loading-dots">
-            <span></span><span></span><span></span>
-        </div>
-    `;
+    var aiMessageEl = appendMessage('assistant', '', pdfChatMessages, 'PDF-RAG');
+    var textEl = aiMessageEl.querySelector('.message-text');
+    textEl.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
 
     try {
-        const response = await fetch('/api/pdf-rag', {
+        var response = await fetch('/api/pdf-rag', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -299,34 +358,31 @@ async function sendPdfMessage() {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
         }
 
-        const payload = await response.json();
-        const data = payload.data || {};
-        const answer = data.answer || '未返回回答';
-        const passages = data.passages || [];
+        var payload = await response.json();
+        var data = payload.data || {};
+        var answer = data.answer || '未返回回答';
+        var passages = data.passages || [];
 
-        const sourceLines = passages.map((item, idx) => (
-            `- ${idx + 1}. ${item.source || '未知来源'} (score=${Number(item.score || 0).toFixed(4)})`
-        ));
-        const rendered = sourceLines.length > 0
-            ? `${answer}\n\n---\n**检索来源**\n${sourceLines.join('\n')}`
+        var sourceLines = passages.map(function (item, idx) {
+            return '- ' + (idx + 1) + '. ' + (item.source || '未知来源') + ' (score=' + Number(item.score || 0).toFixed(4) + ')';
+        });
+        var rendered = sourceLines.length > 0
+            ? answer + '\n\n---\n**检索来源**\n' + sourceLines.join('\n')
             : answer;
         textEl.innerHTML = marked.parse(rendered);
         pdfMessages.push({ role: 'assistant', content: rendered });
         scrollToBottom(pdfChatMessages);
     } catch (error) {
-        textEl.innerHTML = `<span style="color: var(--danger);">PDF-RAG 请求失败：${escapeHtml(error.message)}</span>`;
+        textEl.innerHTML = '<span style="color: var(--danger);">PDF-RAG 请求失败：' + escapeHtml(error.message) + '</span>';
     } finally {
         isPdfGenerating = false;
         pdfSendBtn.disabled = false;
     }
 }
 
-/**
- * 停止生成
- */
 function stopGeneration() {
     if (abortController) {
         abortController.abort();
@@ -335,26 +391,24 @@ function stopGeneration() {
 
 // ==================== UI 辅助函数 ====================
 
-/**
- * 添加消息到界面
- */
-function appendMessage(role, content, container = chatMessages, roleNameOverride = null, avatarOverride = null) {
-    const messageEl = document.createElement('div');
-    messageEl.className = `message ${role}`;
+function appendMessage(role, content, container, roleNameOverride, avatarOverride) {
+    if (!container) container = chatMessages;
 
-    const avatar = avatarOverride || (role === 'user' ? 'You' : '🤖');
-    const roleName = roleNameOverride || (role === 'user' ? '你' : '百炼 AI');
-    const renderedContent = role === 'user' ? escapeHtml(content) : (content ? marked.parse(content) : '');
+    var messageEl = document.createElement('div');
+    messageEl.className = 'message ' + role;
 
-    messageEl.innerHTML = `
-        <div class="message-wrapper">
-            <div class="message-avatar">${avatar}</div>
-            <div class="message-content">
-                <div class="message-role">${roleName}</div>
-                <div class="message-text">${renderedContent}</div>
-            </div>
-        </div>
-    `;
+    var avatar = avatarOverride || (role === 'user' ? 'You' : '🤖');
+    var roleName = roleNameOverride || (role === 'user' ? '你' : '百炼 AI');
+    var renderedContent = role === 'user' ? escapeHtml(content) : (content ? marked.parse(content) : '');
+
+    messageEl.innerHTML =
+        '<div class="message-wrapper">' +
+            '<div class="message-avatar">' + avatar + '</div>' +
+            '<div class="message-content">' +
+                '<div class="message-role">' + roleName + '</div>' +
+                '<div class="message-text">' + renderedContent + '</div>' +
+            '</div>' +
+        '</div>';
 
     container.appendChild(messageEl);
     scrollToBottom(container);
@@ -362,9 +416,6 @@ function appendMessage(role, content, container = chatMessages, roleNameOverride
     return messageEl;
 }
 
-/**
- * 更新 UI 状态（发送/停止按钮切换）
- */
 function updateUIState() {
     if (isGenerating) {
         sendBtn.classList.add('hidden');
@@ -378,46 +429,36 @@ function updateUIState() {
     }
 }
 
-/**
- * 滚动到底部
- */
-function scrollToBottom(container = chatMessages) {
-    requestAnimationFrame(() => {
+function scrollToBottom(container) {
+    if (!container) container = chatMessages;
+    requestAnimationFrame(function () {
         container.scrollTop = container.scrollHeight;
     });
 }
 
-/**
- * HTML 转义
- */
 function escapeHtml(text) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-/**
- * 创建欢迎页面
- */
 function createWelcomeScreen() {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.className = 'welcome-screen';
     div.id = 'welcomeScreen';
-    div.innerHTML = `
-        <div class="welcome-icon">🤖</div>
-        <h1>欢迎使用百炼 AI 对话</h1>
-        <p>基于阿里云百炼大模型，开始你的智能对话之旅</p>
-        <div class="quick-prompts">
-            <button class="prompt-btn" data-prompt="请介绍一下你自己">介绍一下你自己</button>
-            <button class="prompt-btn" data-prompt="用Python写一个快速排序算法">写一个快排算法</button>
-            <button class="prompt-btn" data-prompt="帮我解释一下什么是机器学习">什么是机器学习</button>
-            <button class="prompt-btn" data-prompt="给我讲一个有趣的编程笑话">讲个编程笑话</button>
-        </div>
-    `;
+    div.innerHTML =
+        '<div class="welcome-icon">🤖</div>' +
+        '<h1>欢迎使用百炼 AI 对话</h1>' +
+        '<p>基于阿里云百炼大模型，开始你的智能对话之旅</p>' +
+        '<div class="quick-prompts">' +
+            '<button class="prompt-btn" data-prompt="请介绍一下你自己">介绍一下你自己</button>' +
+            '<button class="prompt-btn" data-prompt="用Python写一个快速排序算法">写一个快排算法</button>' +
+            '<button class="prompt-btn" data-prompt="帮我解释一下什么是机器学习">什么是机器学习</button>' +
+            '<button class="prompt-btn" data-prompt="给我讲一个有趣的编程笑话">讲个编程笑话</button>' +
+        '</div>';
 
-    // 重新绑定快捷提示按钮事件
-    div.querySelectorAll('.prompt-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+    div.querySelectorAll('.prompt-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
             messageInput.value = btn.dataset.prompt;
             sendMessage();
         });
@@ -427,23 +468,22 @@ function createWelcomeScreen() {
 }
 
 function createPdfWelcomeScreen() {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.className = 'welcome-screen';
-    div.innerHTML = `
-        <div class="welcome-icon">📄</div>
-        <h1>PDF-RAG 对话</h1>
-        <p>输入问题后将基于 kaoqin.pdf 切分后的 Milvus 数据回答</p>
-    `;
+    div.innerHTML =
+        '<div class="welcome-icon">📄</div>' +
+        '<h1>PDF-RAG 对话</h1>' +
+        '<p>输入问题后将基于 kaoqin.pdf 切分后的 Milvus 数据回答</p>';
     return div;
 }
 
 function switchTab(tabName) {
     if (tabName === activeTab) return;
     activeTab = tabName;
-    chatTabs.forEach((btn) => {
+    chatTabs.forEach(function (btn) {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
-    const normalActive = tabName === 'normal';
+    var normalActive = tabName === 'normal';
     normalTabPanel.classList.toggle('active', normalActive);
     pdfTabPanel.classList.toggle('active', !normalActive);
     if (normalActive) {
@@ -452,4 +492,3 @@ function switchTab(tabName) {
         pdfMessageInput.focus();
     }
 }
-

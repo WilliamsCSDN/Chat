@@ -424,6 +424,80 @@ body {
     text-decoration: underline;
 }
 
+/* ==================== AG-UI 工具调用卡片 ==================== */
+.tool-call {
+    margin: 8px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-tertiary);
+    font-size: 13px;
+}
+
+.tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+}
+
+.tool-call-header:hover {
+    background: var(--bg-hover);
+}
+
+.tool-call-icon {
+    font-size: 14px;
+}
+
+.tool-call-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.tool-call-status {
+    font-size: 12px;
+    color: #f59e0b;
+}
+
+.tool-call-status.done {
+    color: #10b981;
+}
+
+.tool-call-arrow {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.tool-call-body {
+    border-top: 1px solid var(--border);
+    padding: 0;
+}
+
+.tool-call-section {
+    padding: 8px 12px;
+}
+
+.tool-call-section + .tool-call-section {
+    border-top: 1px solid var(--border);
+}
+
+.tool-call-section-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.tool-call-body pre {
+    margin: 4px 0 0 0;
+    background: #0d0d0d;
+}
+
 /* 打字机光标 */
 .typing-cursor {
     display: inline-block;
