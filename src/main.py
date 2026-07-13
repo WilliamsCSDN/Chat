@@ -1,13 +1,13 @@
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.config.log import init_logging
 from src.config.config_settings import LOG_FILE_PATH, LOG_LEVEL, LOG_TO_FILE, SDK_HTTP_DEBUG
-from src.services.chat_service import chat_stream
+from src.services.chat_service import chat_completions, chat_completions_stream, chat_stream
 from src.services.pdf_rag_service import query_pdf_rag
 
 init_logging(
@@ -63,3 +63,18 @@ async def pdf_rag(request: PdfRagRequest) -> Dict[str, Any]:
         top_k=request.top_k,
     )
     return {"code": 200, "message": "success", "data": result}
+
+
+@app.post("/v1/chat/completions")
+async def openai_chat_completions(request: Dict[str, Any] = Body(...)):
+    if request.get("stream", False):
+        return StreamingResponse(
+            chat_completions_stream(request),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    return await chat_completions(request)

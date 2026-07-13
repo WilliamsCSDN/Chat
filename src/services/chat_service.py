@@ -304,3 +304,50 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
         logger.error("chat_stream 异常 | req_id=%s | err=%s", request_id, e, exc_info=True)
         error_data = json.dumps({"error": str(e)}, ensure_ascii=False)
         yield f"data: {error_data}\n\n"
+
+
+
+
+
+async def chat_completions(request_body: dict) -> dict:
+    """纯转发：非流式调用百炼 OpenAI 兼容接口，返回完整 JSON 响应。"""
+    request_id = str(uuid.uuid4())[:8]
+    request_body['model'] = MODEL_NAME
+    use_model = request_body.get("model", MODEL_NAME)
+
+    logger.info("Chat 转发(非流式) 开始 | req_id=%s | model=%s", request_id, use_model)
+
+    body = dict(request_body)
+    body.pop("stream", None)
+
+    try:
+        response = await client.chat.completions.create(**body)
+        finish = response.choices[0].finish_reason if response.choices else "unknown"
+        tokens = response.usage.total_tokens if response.usage else 0
+        logger.info("Chat 转发(非流式) 结束 | req_id=%s | finish_reason=%s | tokens=%s", request_id, finish, tokens)
+        return response.model_dump(exclude_unset=True)
+    except Exception as e:
+        logger.error("chat_completions 异常 | req_id=%s | err=%s", request_id, e, exc_info=True)
+        return {"error": {"message": str(e), "type": "server_error"}}
+
+
+async def chat_completions_stream(request_body: dict) -> AsyncGenerator[str, None]:
+    """纯转发：流式调用百炼 OpenAI 兼容接口，透传 SSE 事件流。"""
+    request_id = str(uuid.uuid4())[:8]
+    request_body['model'] = MODEL_NAME
+    use_model = request_body.get("model", MODEL_NAME)
+
+    logger.info("Chat 转发(流式) 开始 | req_id=%s | model=%s", request_id, use_model)
+
+    body = dict(request_body)
+    body["stream"] = True
+
+    try:
+        response = await client.chat.completions.create(**body)
+        async for chunk in response:
+            yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
+        yield "data: [DONE]\n\n"
+        logger.info("Chat 转发(流式) 结束 | req_id=%s", request_id)
+    except Exception as e:
+        logger.error("chat_completions_stream 异常 | req_id=%s | err=%s", request_id, e, exc_info=True)
+        yield f"data: {json.dumps({'error': {'message': str(e), 'type': 'server_error'}})}\n\n"
