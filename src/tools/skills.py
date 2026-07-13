@@ -75,7 +75,7 @@ def _parse_skills() -> List[SkillDef]:
             if kw_match:
                 keywords = [kw.strip() for kw in re.split(r"[、,]", kw_match.group(1)) if kw.strip()]
 
-            trigger = f'调用 retrieve_knowledge(query=用户问题, category="{category_name}")'
+            trigger = f'在「{category_name}」分类下检索相关知识'
 
             if category_name and description and milvus_expr:
                 skills.append(SkillDef(
