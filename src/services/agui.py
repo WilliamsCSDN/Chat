@@ -8,6 +8,8 @@ import json
 import uuid
 from typing import Optional
 
+from src.config.config_settings import AGENT_RECURSION_LIMIT
+
 
 def sse(event: dict) -> str:
     """将事件字典序列化为 SSE data 行。"""
@@ -102,7 +104,10 @@ async def stream_agui_events(agent, langchain_messages, thread_id: str):
     async for event in agent.astream_events(
         {"messages": langchain_messages},
         version="v2",
-        config={"configurable": {"thread_id": thread_id}},
+        config={
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": AGENT_RECURSION_LIMIT,
+        },
     ):
         last_event = event
         evt_type = event.get("event", "")

@@ -5,18 +5,28 @@ import time
 import uuid
 from typing import AsyncGenerator, List, Dict
 
-from langchain.agents.middleware import PIIMiddleware, SummarizationMiddleware
+from langchain.agents.middleware import (
+    ModelCallLimitMiddleware,
+    PIIMiddleware,
+    SummarizationMiddleware,
+)
 from openai import AsyncOpenAI
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
 from src.config.config_settings import (
+    AGENT_MODEL_CALL_LIMIT,
     CHAT_LOG_FULL_MESSAGES,
     CHAT_LOG_STREAM_CHUNKS,
     CHAT_LOG_TRUNCATE_CHARS,
     DASHSCOPE_API_KEY,
     DASHSCOPE_BASE_URL,
     MODEL_NAME,
+    SUMMARY_KEEP_MESSAGES,
+    SUMMARY_TRIGGER_MESSAGES,
+    SUMMARY_TRIGGER_TOKENS,
 )
+from src.middleware.security_prompt import inject_security_prompt
+from src.middleware.skill_load_guard import prevent_duplicate_skill_load
 from src.tools.rag_tool import retrieve_knowledge
 from src.tools.skills import skills_load, load_skills_for_context
 from src.tools.weather_tool import get_wether
@@ -50,13 +60,38 @@ def _get_checkpointer():
     return _checkpointer
 
 
+def _build_agent_middleware(chat_model):
+    """构建有界且不会污染会话状态的 Agent 中间件。"""
+    return [
+        ModelCallLimitMiddleware(
+            run_limit=AGENT_MODEL_CALL_LIMIT,
+            exit_behavior="end",
+        ),
+        inject_security_prompt,
+        prevent_duplicate_skill_load,
+        PIIMiddleware(
+            "phone_number",
+            detector=r"\+?\d{1,3}[\s.-]?\d{3,4}[\s.-]?\d{4}",
+            strategy="mask",
+            apply_to_output=True,
+        ),
+        SummarizationMiddleware(
+            model=chat_model,
+            trigger=[
+                ("tokens", SUMMARY_TRIGGER_TOKENS),
+                ("messages", SUMMARY_TRIGGER_MESSAGES),
+            ],
+            keep=("messages", SUMMARY_KEEP_MESSAGES),
+        ),
+    ]
+
+
 def _get_agent(model: str):
     """返回指定 model 对应的 agent 实例，首次使用时创建并缓存。"""
     if model not in _agent_cache:
         from langchain.agents import create_agent
         from langchain_openai import ChatOpenAI
         from src.middleware.input_guard import InputGuardMiddleware
-        from src.middleware.security_prompt import inject_security_prompt
 
         chat_model = ChatOpenAI(
             model=model,
@@ -67,20 +102,7 @@ def _get_agent(model: str):
         _agent_cache[model] = create_agent(
             model=chat_model,
             tools=[get_wether, retrieve_knowledge, skills_load],
-            middleware=[
-                # InputGuardMiddleware(),
-                inject_security_prompt,
-               PIIMiddleware(
-                   "phone_number",
-                   detector=r"\+?\d{1,3}[\s.-]?\d{3,4}[\s.-]?\d{4}",
-                   strategy="mask",
-                    apply_to_output=True,
-               ),
-                SummarizationMiddleware(
-                  model = chat_model,
-                  trigger = [("tokens",100), ("messages", 3)],
-                ),
-            ],
+            middleware=_build_agent_middleware(chat_model),
             checkpointer=_get_checkpointer(),
         )
     return _agent_cache[model]
