@@ -107,3 +107,6 @@ PDF_RAG_SEARCH_EXPR = os.getenv("PDF_RAG_SEARCH_EXPR", "").strip()
 PDF_RAG_MIN_RECALL_K = _get_int("PDF_RAG_MIN_RECALL_K", 12)
 PDF_RAG_RECALL_MULTIPLIER = _get_int("PDF_RAG_RECALL_MULTIPLIER", 6)
 
+
+# SQLite 会话存储配置
+SQLITE_DB_PATH = _get_str("SQLITE_DB_PATH", "data/chat_sessions.db")

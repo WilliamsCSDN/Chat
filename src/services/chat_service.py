@@ -36,12 +36,23 @@ logger = logging.getLogger(__name__)
 # Agent 缓存：按 model name 缓存 CompiledStateGraph，避免每次请求重新编译 graph
 _agent_cache: dict = {}
 
+# SQLite checkpoint saver 单例 - 由 main.py 在 startup 时初始化
+_checkpointer = None
+
+
+def set_checkpointer(cp) -> None:
+    global _checkpointer
+    _checkpointer = cp
+
+
+def _get_checkpointer():
+    return _checkpointer
+
 
 def _get_agent(model: str):
     """返回指定 model 对应的 agent 实例，首次使用时创建并缓存。"""
     if model not in _agent_cache:
         from langchain.agents import create_agent
-        from langgraph.checkpoint.memory import MemorySaver
         from langchain_openai import ChatOpenAI
         from src.middleware.input_guard import InputGuardMiddleware
         from src.middleware.security_prompt import inject_security_prompt
@@ -69,7 +80,7 @@ def _get_agent(model: str):
                   trigger = [("tokens",100), ("messages", 3)],
                 ),
             ],
-            checkpointer=MemorySaver(),
+            checkpointer=_get_checkpointer(),
         )
     return _agent_cache[model]
 
@@ -176,7 +187,7 @@ async def recommend_question(agent, thread_id: str, use_model: str, log_prefix: 
     try:
         # 从 LangGraph checkpoint 获取完整对话历史
         config = {"configurable": {"thread_id": thread_id}}
-        state = agent.get_state(config)
+        state = await agent.aget_state(config)
         checkpoint_messages = []
         if state and state.values and "messages" in state.values:
             checkpoint_messages = state.values["messages"]

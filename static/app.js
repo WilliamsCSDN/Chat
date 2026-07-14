@@ -521,3 +521,165 @@ function switchTab(tabName) {
         pdfMessageInput.focus();
     }
 }
+
+// ==================== 会话回放：工具调用渲染辅助函数 ====================
+
+function createToolCallElement(tc) {
+    var tcContainer = document.createElement('div');
+    tcContainer.className = 'tool-call';
+    var argsJson = '';
+    try {
+        argsJson = JSON.stringify(tc.args, null, 2);
+    } catch (e) {
+        argsJson = String(tc.args || '');
+    }
+    tcContainer.innerHTML =
+        '<div class="tool-call-header" data-tool-id="' + escapeHtml(tc.id) + '">' +
+            '<span class="tool-call-icon">🔧</span>' +
+            '<span class="tool-call-name">' + escapeHtml(tc.name) + '</span>' +
+            '<span class="tool-call-status done">完成</span>' +
+            '<span class="tool-call-arrow">▶</span>' +
+        '</div>' +
+        '<div class="tool-call-body" style="display:none;">' +
+            '<div class="tool-call-section">' +
+                '<div class="tool-call-section-label">参数</div>' +
+                '<div class="tool-call-args"><pre><code>' + escapeHtml(argsJson) + '</code></pre></div>' +
+            '</div>' +
+            '<div class="tool-call-section">' +
+                '<div class="tool-call-section-label">结果</div>' +
+                '<div class="tool-call-result"></div>' +
+            '</div>' +
+        '</div>';
+
+    var header = tcContainer.querySelector('.tool-call-header');
+    var body = tcContainer.querySelector('.tool-call-body');
+    header.addEventListener('click', function () {
+        var isOpen = body.style.display !== 'none';
+        body.style.display = isOpen ? 'none' : 'block';
+        header.querySelector('.tool-call-arrow').textContent = isOpen ? '▶' : '▼';
+    });
+    return tcContainer;
+}
+
+function fillToolCallResult(tcContainer, content) {
+    var resultEl = tcContainer.querySelector('.tool-call-result');
+    var body = tcContainer.querySelector('.tool-call-body');
+    var header = tcContainer.querySelector('.tool-call-header');
+    if (resultEl) {
+        resultEl.innerHTML = '<pre><code>' + escapeHtml(content) + '</code></pre>';
+    }
+    body.style.display = 'block';
+    header.querySelector('.tool-call-arrow').textContent = '▼';
+}
+
+// ==================== 会话管理 ====================
+const sessionList = document.getElementById('sessionList');
+let sessions = [];
+
+async function loadSessions() {
+    try {
+        const res = await fetch('/api/sessions');
+        const payload = await res.json();
+        if (payload.code === 200) {
+            sessions = payload.data || [];
+            renderSessionList();
+        }
+    } catch (e) {
+        console.error('加载会话列表失败:', e);
+    }
+}
+
+function renderSessionList() {
+    if (!sessionList) return;
+    sessionList.innerHTML = '';
+    sessions.forEach(function(s) {
+        var item = document.createElement('div');
+        item.className = 'session-item' + (s.thread_id === currentThreadId ? ' active' : '');
+        item.dataset.threadId = s.thread_id;
+
+        var title = document.createElement('span');
+        title.className = 'session-item-title';
+        title.textContent = s.title || '新对话';
+        title.title = s.title || s.thread_id;
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'session-item-delete';
+        delBtn.innerHTML = '&times;';
+        delBtn.title = '删除会话';
+        delBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            deleteSession(s.thread_id);
+        });
+
+        item.appendChild(title);
+        item.appendChild(delBtn);
+
+        item.addEventListener('click', function() {
+            switchSession(s.thread_id);
+        });
+
+        sessionList.appendChild(item);
+    });
+}
+
+async function switchSession(threadId) {
+    if (threadId === currentThreadId) return;
+    currentThreadId = threadId;
+    renderSessionList();
+
+    messages = [];
+    chatMessages.innerHTML = '';
+    var wEl = document.getElementById('welcomeScreen');
+    if (wEl) wEl.remove();
+
+    try {
+        var res = await fetch('/api/sessions/' + threadId + '/messages');
+        var payload = await res.json();
+        var histMsgs = payload.data || [];
+        var toolCallElements = {};
+
+        for (var i = 0; i < histMsgs.length; i++) {
+            var msg = histMsgs[i];
+            messages.push(msg);
+
+            if (msg.role === 'assistant' && msg.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+                var aiMsgEl = appendMessage('assistant', msg.content || '');
+                var lastToolRef = aiMsgEl.querySelector('.message-role');
+
+                for (var j = 0; j < msg.tool_calls.length; j++) {
+                    var tc = msg.tool_calls[j];
+                    var tcContainer = createToolCallElement(tc);
+                    lastToolRef.insertAdjacentElement('afterend', tcContainer);
+                    lastToolRef = tcContainer;
+                    toolCallElements[tc.id] = tcContainer;
+                }
+            } else if (msg.role === 'tool' && msg.tool_call_id && toolCallElements[msg.tool_call_id]) {
+                fillToolCallResult(toolCallElements[msg.tool_call_id], msg.content);
+            } else {
+                appendMessage(msg.role, msg.content);
+            }
+        }
+        scrollToBottom();
+    } catch(e) {
+        console.error('加载历史消息失败:', e);
+    }
+}
+
+async function deleteSession(threadId) {
+    if (!confirm('确定要删除这个对话吗？')) return;
+    try {
+        await fetch('/api/sessions/' + threadId, { method: 'DELETE' });
+        sessions = sessions.filter(function(s) { return s.thread_id !== threadId; });
+        if (threadId === currentThreadId) {
+            currentThreadId = null;
+            messages = [];
+            chatMessages.innerHTML = '';
+            chatMessages.appendChild(createWelcomeScreen());
+        }
+        renderSessionList();
+    } catch(e) {
+        console.error('删除会话失败:', e);
+    }
+}
+
+loadSessions();

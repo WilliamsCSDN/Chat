@@ -707,3 +707,68 @@ body {
     border-color: var(--accent);
     color: var(--text-primary);
 }
+
+/* ==================== 会话列表 ==================== */
+.session-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+.session-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+    position: relative;
+}
+
+.session-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.session-item.active {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--accent);
+}
+
+.session-item-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-item-delete {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.session-item:hover .session-item-delete {
+    display: flex;
+}
+
+.session-item-delete:hover {
+    background: var(--danger);
+    color: white;
+}

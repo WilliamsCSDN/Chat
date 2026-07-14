@@ -1,14 +1,10 @@
-from typing import Any, Dict, List, Optional
+"""FastAPI 应用入口 — 负责初始化日志、挂载静态文件、注册路由和启动事件。"""
 
-from fastapi import Body, FastAPI
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
 from src.config.log import init_logging
 from src.config.config_settings import LOG_FILE_PATH, LOG_LEVEL, LOG_TO_FILE, SDK_HTTP_DEBUG
-from src.services.chat_service import chat_completions, chat_completions_stream, chat_stream
-from src.services.pdf_rag_service import query_pdf_rag
 
 init_logging(
     level=LOG_LEVEL,
@@ -18,64 +14,23 @@ init_logging(
 )
 
 app = FastAPI(title="百炼大模型对话", version="1.0.0")
+
+
+@app.on_event("startup")
+async def startup_checkpointer():
+    from src.services.session_service import init_checkpointer
+    await init_checkpointer()
+
+
+# ── 静态文件 ──
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# ── 路由注册 ──
+from src.router.root import router as root_router
+from src.router.chat import router as chat_router, v1_router
+from src.router.sessions import router as sessions_router
 
-class ChatRequest(BaseModel):
-    messages: List[Dict[str, str]]
-    model: Optional[str] = None
-    thread_id: Optional[str] = None
-
-
-class PdfRagRequest(BaseModel):
-    query: str
-    model: Optional[str] = None
-    top_k: Optional[int] = None
-
-
-@app.get("/", response_class=HTMLResponse)
-async def index() -> FileResponse:
-    return FileResponse("static/index.html")
-
-
-@app.get("/health")
-async def health() -> Dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.post("/api/chat")
-async def chat(request: ChatRequest) -> StreamingResponse:
-    return StreamingResponse(
-        chat_stream(request.messages, request.model, request.thread_id),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-@app.post("/api/pdf-rag")
-async def pdf_rag(request: PdfRagRequest) -> Dict[str, Any]:
-    result = await query_pdf_rag(
-        query=request.query,
-        model=request.model,
-        top_k=request.top_k,
-    )
-    return {"code": 200, "message": "success", "data": result}
-
-
-@app.post("/v1/chat/completions")
-async def openai_chat_completions(request: Dict[str, Any] = Body(...)):
-    if request.get("stream", False):
-        return StreamingResponse(
-            chat_completions_stream(request),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
-        )
-    return await chat_completions(request)
+app.include_router(root_router)
+app.include_router(chat_router)
+app.include_router(v1_router)
+app.include_router(sessions_router)
