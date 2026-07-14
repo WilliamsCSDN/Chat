@@ -5,7 +5,7 @@ import time
 import uuid
 from typing import AsyncGenerator, List, Dict
 
-from langchain.agents.middleware import PIIMiddleware
+from langchain.agents.middleware import PIIMiddleware, SummarizationMiddleware
 from openai import AsyncOpenAI
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
@@ -63,6 +63,10 @@ def _get_agent(model: str):
                    strategy="mask",
                     apply_to_output=True,
                ),
+                SummarizationMiddleware(
+                  model = chat_model,
+                  trigger = [("tokens",100), ("messages", 3)],
+                ),
             ],
             checkpointer=MemorySaver(),
         )
