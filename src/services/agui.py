@@ -184,3 +184,10 @@ async def stream_agui_events(agent, langchain_messages, thread_id: str):
 def suggested_questions(questions: list) -> dict:
     """推荐后续问题事件，questions 为字符串列表。"""
     return {"type": "SUGGESTED_QUESTIONS", "questions": questions}
+
+
+# ── 会话标题 ──
+
+def session_title(thread_id: str, title: str) -> dict:
+    """新会话生成标题后推送到前端。"""
+    return {"type": "SESSION_TITLE", "threadId": thread_id, "title": title}

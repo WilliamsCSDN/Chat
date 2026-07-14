@@ -265,6 +265,12 @@ async function generateResponse() {
                     }
                     break;
 
+                case 'SESSION_TITLE':
+                    if (data.threadId && data.title) {
+                        upsertSession(data.threadId, data.title);
+                    }
+                    break;
+
                 case 'RUN_FINISHED':
                     if (textEl._fullContent) {
                         textEl.innerHTML = marked.parse(textEl._fullContent);
@@ -683,3 +689,29 @@ async function deleteSession(threadId) {
 }
 
 loadSessions();
+
+function upsertSession(threadId, title) {
+    // 如果 sidebar 还没渲染，先加载列表
+    if (!sessions.length) {
+        sessions.unshift({
+            thread_id: threadId,
+            title: title,
+            updated_at: new Date().toISOString()
+        });
+        renderSessionList();
+        return;
+    }
+    // 更新已有或插入新项
+    var existing = sessions.find(function(s) { return s.thread_id === threadId; });
+    if (existing) {
+        existing.title = title;
+        renderSessionList();
+    } else {
+        sessions.unshift({
+            thread_id: threadId,
+            title: title,
+            updated_at: new Date().toISOString()
+        });
+        renderSessionList();
+    }
+}

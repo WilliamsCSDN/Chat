@@ -22,6 +22,7 @@ from src.tools.skills import skills_load, load_skills_for_context
 from src.tools.weather_tool import get_wether
 from src.services.agui import (
     stream_agui_events,
+    session_title,
     suggested_questions,
     sse,
     run_started,
@@ -145,6 +146,14 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_
     # AG-UI: RUN_STARTED
     yield sse(run_started(thread_id, run_id))
 
+    # 新对话：立即启动标题生成任务，与 agent 响应并行
+    title_task = None
+    if is_new_thread and messages:
+        first_msg = messages[0].get("content", "") if messages else ""
+        if first_msg:
+            from src.services.session_service import generate_and_save_title
+            title_task = asyncio.create_task(generate_and_save_title(thread_id, first_msg))
+
     try:
         # 将 dict 消息转换为 LangChain 消息对象
         langchain_messages = []
@@ -175,6 +184,13 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_
         )
         # AG-UI: RUN_FINISHED
         yield sse(run_finished(thread_id, run_id))
+        # 等待标题任务完成并推送到前端
+        if title_task:
+            try:
+                title = await title_task
+                yield sse(session_title(thread_id, title))
+            except Exception:
+                pass
         # 推荐后续问题
         async for event in recommend_question(agent, thread_id, use_model, log_prefix):
             yield event
