@@ -69,7 +69,7 @@ def _get_agent(model: str):
             tools=[get_wether, retrieve_knowledge, skills_load],
             middleware=[
                 # InputGuardMiddleware(),
-                # inject_security_prompt,
+                inject_security_prompt,
                PIIMiddleware(
                    "phone_number",
                    detector=r"\+?\d{1,3}[\s.-]?\d{3,4}[\s.-]?\d{4}",

@@ -1,6 +1,6 @@
 ---
 name: rag-categories
-description: RAG knowledge retrieval with categorized Milvus filtering. Use when the user asks about 支付 (payment), 分润 (profit sharing), or 进件 (merchant onboarding) topics, or when the query relates to Chinese payment/clearing domain knowledge. Triggers retrieve_knowledge with the appropriate category tag and Milvus filter expression to scope retrieval to the correct knowledge partition.
+description: 当用户问题涉及支付、分润、进件领域时，调用此技能进行 RAG 知识检索。通过分类标签和 Milvus 过滤表达式限定检索范围，精准命中对应知识分区。
 ---
 
 # RAG 分类检索技能
