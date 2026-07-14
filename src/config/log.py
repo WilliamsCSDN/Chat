@@ -1,5 +1,6 @@
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 
 
 def init_logging(
@@ -15,6 +16,8 @@ def init_logging(
     if not root_logger.handlers:
         handlers = [logging.StreamHandler()]
         if log_to_file:
+            log_dir = os.path.dirname(os.path.abspath(log_file_path))
+            os.makedirs(log_dir, exist_ok=True)
             handlers.append(
                 RotatingFileHandler(
                     log_file_path,

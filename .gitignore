@@ -3,3 +3,4 @@
 /test/milvus/models/
 docs
 .superpowers/
+.log/

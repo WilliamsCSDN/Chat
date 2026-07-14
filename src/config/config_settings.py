@@ -77,8 +77,8 @@ MILVUS_EMBEDDING_MODEL_PATH = os.getenv(
 
 # 日志配置
 LOG_LEVEL = _get_str("LOG_LEVEL", "INFO").upper()
-LOG_TO_FILE = _get_bool("LOG_TO_FILE", False)
-LOG_FILE_PATH = _get_str("LOG_FILE_PATH", "app.log")
+LOG_TO_FILE = _get_bool("LOG_TO_FILE", True)
+LOG_FILE_PATH = _get_str("LOG_FILE_PATH", ".log/app.log")
 SDK_HTTP_DEBUG = _get_bool("SDK_HTTP_DEBUG", True)
 CHAT_LOG_FULL_MESSAGES = _get_bool("CHAT_LOG_FULL_MESSAGES", True)
 
