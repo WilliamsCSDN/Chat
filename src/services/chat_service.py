@@ -5,6 +5,7 @@ import time
 import uuid
 from typing import AsyncGenerator, List, Dict
 
+from langchain.agents.middleware import PIIMiddleware
 from openai import AsyncOpenAI
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
@@ -39,6 +40,7 @@ def _get_agent(model: str):
     """返回指定 model 对应的 agent 实例，首次使用时创建并缓存。"""
     if model not in _agent_cache:
         from langchain.agents import create_agent
+        from langgraph.checkpoint.memory import MemorySaver
         from langchain_openai import ChatOpenAI
         from src.middleware.input_guard import InputGuardMiddleware
         from src.middleware.security_prompt import inject_security_prompt
@@ -53,9 +55,16 @@ def _get_agent(model: str):
             model=chat_model,
             tools=[get_wether, retrieve_knowledge, skills_load],
             middleware=[
-                InputGuardMiddleware(),
-                inject_security_prompt,
+                # InputGuardMiddleware(),
+                # inject_security_prompt,
+               PIIMiddleware(
+                   "phone_number",
+                   detector=r"\+?\d{1,3}[\s.-]?\d{3,4}[\s.-]?\d{4}",
+                   strategy="mask",
+                    apply_to_output=True,
+               ),
             ],
+            checkpointer=MemorySaver(),
         )
     return _agent_cache[model]
 
@@ -100,10 +109,11 @@ def _log_messages(prefix: str, messages: List[Dict[str, str]]) -> None:
 
 
 
-async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> AsyncGenerator[str, None]:
+async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_id: str = None) -> AsyncGenerator[str, None]:
     from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
-    thread_id = str(uuid.uuid4())
+    is_new_thread = thread_id is None
+    thread_id = thread_id or str(uuid.uuid4())
     run_id = str(uuid.uuid4())
     started_at = time.perf_counter()
     use_model = model or MODEL_NAME
@@ -122,7 +132,10 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None) -> Asyn
     try:
         # 将 dict 消息转换为 LangChain 消息对象
         langchain_messages = []
-        for msg in messages:
+        # 复用 thread 时 LangGraph 从 checkpoint 恢复历史，
+        # add_messages reducer 会追加新消息，所以只传最后一条避免重复。
+        source_messages = [messages[-1]] if not is_new_thread else messages
+        for msg in source_messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
             if role == "system":

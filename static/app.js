@@ -25,6 +25,7 @@ let isGenerating = false;
 let abortController = null;
 let isPdfGenerating = false;
 let activeTab = 'normal';
+let currentThreadId = null;
 
 // ==================== 初始化 Marked ====================
 marked.setOptions({
@@ -48,6 +49,7 @@ chatTabs.forEach((btn) => {
 });
 
 newChatBtn.addEventListener('click', () => {
+    currentThreadId = null;
     if (activeTab === 'normal') {
         messages = [];
         chatMessages.innerHTML = '';
@@ -141,8 +143,9 @@ async function generateResponse() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                messages: messages,
+                messages: currentThreadId ? [messages[messages.length - 1]] : messages,
                 model: modelSelect.value,
+                thread_id: currentThreadId || undefined,
             }),
             signal: abortController.signal,
         });
@@ -255,6 +258,9 @@ async function generateResponse() {
                     break;
 
                 case 'RUN_STARTED':
+                    if (data.threadId) {
+                        currentThreadId = data.threadId;
+                    }
                     break;
 
                 case 'RUN_FINISHED':

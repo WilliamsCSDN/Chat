@@ -24,6 +24,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 class ChatRequest(BaseModel):
     messages: List[Dict[str, str]]
     model: Optional[str] = None
+    thread_id: Optional[str] = None
 
 
 class PdfRagRequest(BaseModel):
@@ -45,7 +46,7 @@ async def health() -> Dict[str, str]:
 @app.post("/api/chat")
 async def chat(request: ChatRequest) -> StreamingResponse:
     return StreamingResponse(
-        chat_stream(request.messages, request.model),
+        chat_stream(request.messages, request.model, request.thread_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
