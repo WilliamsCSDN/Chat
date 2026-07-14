@@ -22,6 +22,7 @@ from src.tools.skills import skills_load, load_skills_for_context
 from src.tools.weather_tool import get_wether
 from src.services.agui import (
     stream_agui_events,
+    suggested_questions,
     sse,
     run_started,
     run_finished,
@@ -163,10 +164,58 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_
         )
         # AG-UI: RUN_FINISHED
         yield sse(run_finished(thread_id, run_id))
+        # 推荐后续问题
+        async for event in recommend_question(agent, thread_id, use_model, log_prefix):
+            yield event
 
     except Exception as e:
         logger.error("chat_stream 异常 | run_id=%s | err=%s", log_prefix, e, exc_info=True)
         yield sse(run_error(str(e), "INTERNAL_ERROR"))
+
+async def recommend_question(agent, thread_id: str, use_model: str, log_prefix: str):
+    try:
+        # 从 LangGraph checkpoint 获取完整对话历史
+        config = {"configurable": {"thread_id": thread_id}}
+        state = agent.get_state(config)
+        checkpoint_messages = []
+        if state and state.values and "messages" in state.values:
+            checkpoint_messages = state.values["messages"]
+        elif state and hasattr(state, "values") and state.values and "messages" in state.values:
+            checkpoint_messages = state.values["messages"]
+
+        suggestion_prompt = (
+            "根据以上对话内容，请推荐 3 个用户可能感兴趣的后续问题。\n"
+            '输出一个 JSON 对象，格式为 {"questions": ["问题1", "问题2", "问题3"]}'
+        )
+        suggestion_messages = [
+            {"role": "system", "content": suggestion_prompt},
+        ]
+        # 取最近 6 条 checkpoint 消息作为上下文
+        for msg in checkpoint_messages[-6:]:
+            content_text = msg.content if hasattr(msg, "content") else str(msg)
+            _role_map = {"human": "user", "ai": "assistant", "system": "system", "tool": "tool"}
+            role = _role_map.get(msg.type, "user")
+            suggestion_messages.append({"role": role, "content": content_text})
+        suggestion_response = await client.chat.completions.create(
+            model=use_model,
+            messages=suggestion_messages,
+            temperature=0.7,
+            max_tokens=200,
+            response_format={"type": "json_object"},
+        )
+        content = suggestion_response.choices[0].message.content.strip()
+        import json
+        data = json.loads(content)
+        questions = data.get("questions", [])
+        if isinstance(questions, list) and len(questions) > 0:
+            yield sse(suggested_questions(questions[:3]))
+            logger.info(
+                "Chat 建议问题 | run_id=%s | questions=%s",
+                log_prefix, questions,
+            )
+    except Exception as e:
+        logger.warning("Chat 建议问题生成失败 | run_id=%s | err=%s", log_prefix, e)
+
 async def chat_completions(request_body: dict) -> dict:
     """纯转发：非流式调用百炼 OpenAI 兼容接口，返回完整 JSON 响应。"""
     request_id = str(uuid.uuid4())[:8]

@@ -129,6 +129,8 @@ async function sendMessage() {
 async function generateResponse() {
     isGenerating = true;
     updateUIState();
+    // 清除所有旧的建议问题
+    document.querySelectorAll('.suggested-questions').forEach(function(el) { el.remove(); });
 
     const aiMessageEl = appendMessage('assistant', '');
     const textEl = aiMessageEl.querySelector('.message-text');
@@ -270,7 +272,28 @@ async function generateResponse() {
                             hljs.highlightElement(block);
                         });
                     }
+                case 'SUGGESTED_QUESTIONS':
+                    if (data.questions && Array.isArray(data.questions)) {
+                        var sContainer = document.createElement('div');
+                        sContainer.className = 'suggested-questions';
+                        data.questions.forEach(function(question) {
+                            var chip = document.createElement('button');
+                            chip.className = 'suggested-question-chip';
+                            chip.textContent = question;
+                            chip.addEventListener('click', function() {
+                                document.querySelectorAll('.suggested-questions').forEach(function(el) { el.remove(); });
+                                messageInput.value = question;
+                                sendMessage();
+                            });
+                            sContainer.appendChild(chip);
+                        });
+                        var mc = aiMessageEl.querySelector('.message-content');
+                        if (mc) {
+                            mc.appendChild(sContainer);
+                        }
+                    }
                     break;
+
 
                 case 'RUN_ERROR':
                     textEl._fullContent = null;

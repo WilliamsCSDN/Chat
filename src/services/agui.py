@@ -177,3 +177,10 @@ async def stream_agui_events(agent, langchain_messages, thread_id: str):
 
     if message_started:
         yield sse(text_message_end(message_id))
+
+
+# ── 建议问题 ──
+
+def suggested_questions(questions: list) -> dict:
+    """推荐后续问题事件，questions 为字符串列表。"""
+    return {"type": "SUGGESTED_QUESTIONS", "questions": questions}
