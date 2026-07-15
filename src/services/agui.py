@@ -228,8 +228,7 @@ async def stream_agui_events(
                             text_parts.append(part)
                     content_text = "".join(text_parts)
                 if isinstance(content_text, str) and content_text:
-                    if _message_count >= 1 and not message_started:
-                        continue
+                    # 每一轮模型输出（含 tool 调用后的最终回复）都推送到前端
                     if not message_started:
                         _message_count += 1
                         message_started = True

@@ -1,4 +1,4 @@
-"""FastAPI 应用入口 — 负责初始化日志、挂载静态文件、注册路由和启动事件。"""
+"""FastAPI 应用入口 — 负责初始化日志、挂载静态文件、注册路由、启动事件及 MCP 工具。"""
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +19,12 @@ app = FastAPI(title="百炼大模型对话", version="1.0.0")
 @app.on_event("startup")
 async def startup_checkpointer():
     from src.services.session_service import init_checkpointer
+    from src.mcp import MCPManager, set_mcp_manager
     await init_checkpointer()
+    mcp = MCPManager()
+    mcp.load_config("mcp_config.json")
+    await mcp.discover_tools()
+    set_mcp_manager(mcp)
 
 
 # ── 静态文件 ──

@@ -1,0 +1,35 @@
+
+{
+  "mcpServers": {
+    "my-coffee": {
+      "type": "streamablehttp",
+      "url": "https://gwmcp.lkcoffee.com/order/user/mcp",
+      "headers": {
+        "Authorization": "Bearer "
+      }
+    },
+
+    "tyc-mcp": {
+      "url": "https://mcp.tianyancha.com/v1",
+      "headers": {
+        "Authorization": ""
+      }
+    },
+
+    "RollingGo-Hotel": {
+      "url": "https://mcp.rollinggo.cn/mcp",
+      "type": "http",
+      "headers": {
+        "Authorization": "Bearer "
+      }
+    },
+    "RollingGo-Flight": {
+      "url": "https://mcp.rollinggo.cn/mcp/flight",
+      "type": "http",
+      "headers": {
+        "Authorization": "Bearer "
+      }
+    }
+
+  }
+}

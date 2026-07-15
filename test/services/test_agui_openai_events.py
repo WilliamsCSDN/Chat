@@ -142,6 +142,96 @@ class AguiOpenAIEventsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("assistant", roles)
         self.assertIn("tool", roles)
 
+    async def test_emits_text_message_after_tool_round(self):
+        """工具调用前旁白 + 工具后最终回复都应推送 TEXT_MESSAGE。"""
+        human = HumanMessage(content="深圳布吉木棉湾附近酒店")
+        tool_ai = AIMessage(
+            content="我来帮您查找酒店。",
+            tool_calls=[
+                {
+                    "id": "call_hotel",
+                    "name": "searchHotels",
+                    "args": {"place": "木棉湾地铁站", "placeType": "地铁站"},
+                }
+            ],
+        )
+        final_ai = AIMessage(content="感谢您的耐心等待！为您找到以下酒店。")
+
+        events = [
+            {
+                "event": "on_chat_model_start",
+                "run_id": "run-model-1",
+                "data": {"input": {"messages": [human]}},
+                "metadata": {"ls_model_name": "qwen-plus"},
+            },
+            {
+                "event": "on_chat_model_stream",
+                "run_id": "run-model-1",
+                "data": {"chunk": AIMessageChunk(content="我来帮您查找酒店。")},
+            },
+            {
+                "event": "on_chat_model_end",
+                "run_id": "run-model-1",
+                "data": {"output": tool_ai},
+            },
+            {
+                "event": "on_tool_start",
+                "run_id": "run-tool-1",
+                "name": "searchHotels",
+                "data": {"input": {"place": "木棉湾地铁站"}},
+            },
+            {
+                "event": "on_tool_end",
+                "run_id": "run-tool-1",
+                "data": {
+                    "output": ToolMessage(
+                        content='{"success":true,"hotels":[]}',
+                        tool_call_id="call_hotel",
+                        name="searchHotels",
+                    )
+                },
+            },
+            {
+                "event": "on_chat_model_start",
+                "run_id": "run-model-2",
+                "data": {"input": {"messages": [human, tool_ai]}},
+                "metadata": {"ls_model_name": "qwen-plus"},
+            },
+            {
+                "event": "on_chat_model_stream",
+                "run_id": "run-model-2",
+                "data": {"chunk": AIMessageChunk(content="感谢您的耐心等待！")},
+            },
+            {
+                "event": "on_chat_model_stream",
+                "run_id": "run-model-2",
+                "data": {"chunk": AIMessageChunk(content="为您找到以下酒店。")},
+            },
+            {
+                "event": "on_chat_model_end",
+                "run_id": "run-model-2",
+                "data": {"output": final_ai},
+            },
+        ]
+
+        agent = _FakeAgent(events)
+        parsed = [
+            _parse_sse(line)
+            async for line in stream_agui_events(agent, [human], "thread-hotel")
+        ]
+        text_deltas = [
+            e["delta"] for e in parsed if e["type"] == "TEXT_MESSAGE_CONTENT"
+        ]
+        text_starts = [e for e in parsed if e["type"] == "TEXT_MESSAGE_START"]
+        text_ends = [e for e in parsed if e["type"] == "TEXT_MESSAGE_END"]
+
+        self.assertEqual(len(text_starts), 2)
+        self.assertEqual(len(text_ends), 2)
+        self.assertEqual(
+            "".join(text_deltas),
+            "我来帮您查找酒店。感谢您的耐心等待！为您找到以下酒店。",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

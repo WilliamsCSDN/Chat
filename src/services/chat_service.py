@@ -41,11 +41,13 @@ from src.services.agui import (
 )
 from src.services.input_guard import *
 from src.config.config_settings import INPUT_GUARD_ENABLED
+from src.mcp import get_mcp_manager
 
 logger = logging.getLogger(__name__)
 
 # Agent 缓存：按 model name 缓存 CompiledStateGraph，避免每次请求重新编译 graph
 _agent_cache: dict = {}
+_agent_tools_cache: dict[str, list] = {}
 
 # SQLite checkpoint saver 单例 - 由 main.py 在 startup 时初始化
 _checkpointer = None
@@ -75,14 +77,14 @@ def _build_agent_middleware(chat_model):
             strategy="mask",
             apply_to_output=True,
         ),
-        SummarizationMiddleware(
-            model=chat_model,
-            trigger=[
-                ("tokens", SUMMARY_TRIGGER_TOKENS),
-                ("messages", SUMMARY_TRIGGER_MESSAGES),
-            ],
-            keep=("messages", SUMMARY_KEEP_MESSAGES),
-        ),
+        # SummarizationMiddleware(
+        #     model=chat_model,
+        #     trigger=[
+        #         ("tokens", SUMMARY_TRIGGER_TOKENS),
+        #         ("messages", SUMMARY_TRIGGER_MESSAGES),
+        #     ],
+        #     keep=("messages", SUMMARY_KEEP_MESSAGES),
+        # ),
     ]
 
 
@@ -93,6 +95,10 @@ def _get_agent(model: str):
         from langchain_openai import ChatOpenAI
         from src.middleware.input_guard import InputGuardMiddleware
 
+        mcp = get_mcp_manager()
+        mcp_tools = mcp.get_tools() if mcp else []
+        tools = [get_wether, retrieve_knowledge, skills_load] + mcp_tools
+
         chat_model = ChatOpenAI(
             model=model,
             api_key=DASHSCOPE_API_KEY,
@@ -101,10 +107,11 @@ def _get_agent(model: str):
         )
         _agent_cache[model] = create_agent(
             model=chat_model,
-            tools=[get_wether, retrieve_knowledge, skills_load],
+            tools=tools,
             middleware=_build_agent_middleware(chat_model),
             checkpointer=_get_checkpointer(),
         )
+        _agent_tools_cache[model] = tools
     return _agent_cache[model]
 
 
@@ -113,20 +120,6 @@ client = AsyncOpenAI(
     api_key=DASHSCOPE_API_KEY,
     base_url=DASHSCOPE_BASE_URL,
 )
-
-# 注册可用的工具（name -> 实际函数的映射）
-AVAILABLE_TOOLS = {
-    "get_wether": get_wether,
-    "retrieve_knowledge": retrieve_knowledge,
-    "skills_load": skills_load,
-}
-
-# 转换为 OpenAI tools 格式（列表）
-TOOLS_SCHEMA = [
-    convert_to_openai_tool(get_wether),
-    convert_to_openai_tool(retrieve_knowledge),
-    convert_to_openai_tool(skills_load),
-]
 
 def _truncate(text: str, max_len: int = 500) -> str:
     if CHAT_LOG_TRUNCATE_CHARS <= 0:
@@ -150,6 +143,10 @@ def _log_messages(prefix: str, messages: List[Dict[str, str]]) -> None:
 
 async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_id: str = None) -> AsyncGenerator[str, None]:
     from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+
+    def _build_tools_schema():
+        agent_tools = _agent_tools_cache.get(use_model, [get_wether, retrieve_knowledge, skills_load])
+        return [convert_to_openai_tool(t) for t in agent_tools]
 
     is_new_thread = thread_id is None
     thread_id = thread_id or str(uuid.uuid4())
@@ -200,7 +197,7 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_
             langchain_messages,
             thread_id,
             model=use_model,
-            tools=TOOLS_SCHEMA,
+            tools=_build_tools_schema(),
         ):
             yield sse_event
 
