@@ -107,9 +107,29 @@
                 </div>
             </section>
         </main>
+
+        <!-- OpenAI 规范交互面板 -->
+        <aside class="openai-inspector" id="openaiInspector">
+            <div class="openai-inspector-header">
+                <h3>OpenAI 交互</h3>
+                <span class="openai-inspector-hint">Chat Completions 协议</span>
+            </div>
+            <div class="openai-inspector-section">
+                <div class="openai-inspector-section-title">Messages</div>
+                <div class="openai-messages" id="openaiMessages">
+                    <div class="openai-empty">对话开始后将显示 messages 时间线</div>
+                </div>
+            </div>
+            <div class="openai-inspector-section openai-inspector-section-calls">
+                <div class="openai-inspector-section-title">Model Calls</div>
+                <div class="openai-model-calls" id="openaiModelCalls">
+                    <div class="openai-empty">模型请求/响应将显示在此处</div>
+                </div>
+            </div>
+        </aside>
     </div>
 
-    <script src="/static/app.js?v=3"></script>
+    <script src="/static/app.js?v=5"></script>
 </body>
 </html>
 

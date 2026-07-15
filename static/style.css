@@ -772,3 +772,248 @@ body {
     background: var(--danger);
     color: white;
 }
+
+/* ==================== OpenAI 交互面板 ==================== */
+.openai-inspector {
+    width: 380px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.openai-inspector-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.openai-inspector-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.openai-inspector-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.openai-inspector-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+    border-bottom: 1px solid var(--border);
+}
+
+.openai-inspector-section-calls {
+    flex: 1;
+    border-bottom: none;
+}
+
+.openai-inspector-section-title {
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-tertiary);
+}
+
+.openai-messages,
+.openai-model-calls {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 12px;
+    min-height: 0;
+}
+
+.openai-empty {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 12px 4px;
+    line-height: 1.5;
+}
+
+.openai-msg-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.openai-msg-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.openai-msg-header:hover {
+    background: var(--bg-hover);
+}
+
+.openai-role-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.openai-role-badge.user {
+    background: #2b2b40;
+    color: #a5b4fc;
+}
+
+.openai-role-badge.assistant {
+    background: #1e2a1e;
+    color: #86efac;
+}
+
+.openai-role-badge.tool {
+    background: #2a2418;
+    color: #fbbf24;
+}
+
+.openai-role-badge.system {
+    background: #1a1a2e;
+    color: #93c5fd;
+}
+
+.openai-msg-summary {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.openai-msg-arrow {
+    font-size: 10px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.openai-msg-body {
+    display: none;
+    padding: 0 10px 10px;
+    border-top: 1px solid var(--border);
+}
+
+.openai-msg-body.open {
+    display: block;
+}
+
+.openai-msg-body pre {
+    margin: 8px 0 0;
+    padding: 10px;
+    background: #0a0a0a;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.45;
+    overflow-x: auto;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.openai-msg-card.has-tools .openai-role-badge.assistant {
+    outline: 1px solid #86efac;
+}
+
+.openai-call-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.openai-call-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.openai-call-header:hover {
+    background: var(--bg-hover);
+}
+
+.openai-call-index {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.openai-call-finish {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.openai-call-body {
+    display: none;
+    padding: 0 10px 10px;
+    border-top: 1px solid var(--border);
+}
+
+.openai-call-body.open {
+    display: block;
+}
+
+.openai-call-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 10px 0 4px;
+}
+
+.openai-call-body pre {
+    margin: 0;
+    padding: 10px;
+    background: #0a0a0a;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.45;
+    overflow-x: auto;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+@media (max-width: 1100px) {
+    .openai-inspector {
+        width: 320px;
+    }
+}
+
+@media (max-width: 900px) {
+    .openai-inspector {
+        display: none;
+    }
+}

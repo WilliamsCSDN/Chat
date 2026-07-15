@@ -17,6 +17,8 @@ const pdfTabPanel = document.getElementById('pdfTabPanel');
 const pdfChatMessages = document.getElementById('pdfChatMessages');
 const pdfMessageInput = document.getElementById('pdfMessageInput');
 const pdfSendBtn = document.getElementById('pdfSendBtn');
+const openaiMessagesEl = document.getElementById('openaiMessages');
+const openaiModelCallsEl = document.getElementById('openaiModelCalls');
 
 // ==================== 状态管理 ====================
 let messages = [];
@@ -26,6 +28,10 @@ let abortController = null;
 let isPdfGenerating = false;
 let activeTab = 'normal';
 let currentThreadId = null;
+let openaiCallIndex = 0;
+const openaiCallElements = {};
+let openaiMessagesEmpty = true;
+let openaiCallsEmpty = true;
 
 // ==================== 初始化 Marked ====================
 marked.setOptions({
@@ -54,6 +60,7 @@ newChatBtn.addEventListener('click', () => {
         messages = [];
         chatMessages.innerHTML = '';
         chatMessages.appendChild(createWelcomeScreen());
+        clearOpenAIInspector();
         messageInput.focus();
         return;
     }
@@ -305,6 +312,24 @@ async function generateResponse() {
                     textEl._fullContent = null;
                     textEl.innerHTML = '<span style="color: var(--danger);">错误：' + escapeHtml(data.message) + '</span>';
                     break;
+
+                case 'OPENAI_MESSAGES_UPSERT':
+                    if (data.message) {
+                        appendOpenAIMessage(data.message);
+                    }
+                    break;
+
+                case 'OPENAI_MODEL_REQUEST':
+                    handleOpenAIModelRequest(data);
+                    break;
+
+                case 'OPENAI_MODEL_CHUNK':
+                    handleOpenAIModelChunk(data);
+                    break;
+
+                case 'OPENAI_MODEL_RESPONSE':
+                    handleOpenAIModelResponse(data);
+                    break;
             }
         }
 
@@ -528,9 +553,240 @@ function switchTab(tabName) {
     }
 }
 
+// ==================== OpenAI 交互面板 ====================
+
+function clearOpenAIInspector() {
+    openaiCallIndex = 0;
+    Object.keys(openaiCallElements).forEach(function (k) { delete openaiCallElements[k]; });
+    openaiMessagesEmpty = true;
+    openaiCallsEmpty = true;
+    if (openaiMessagesEl) {
+        openaiMessagesEl.innerHTML = '<div class="openai-empty">对话开始后将显示 messages 时间线</div>';
+    }
+    if (openaiModelCallsEl) {
+        openaiModelCallsEl.innerHTML = '<div class="openai-empty">模型请求/响应将显示在此处</div>';
+    }
+}
+
+function clearOpenAIModelCalls() {
+    openaiCallIndex = 0;
+    Object.keys(openaiCallElements).forEach(function (k) { delete openaiCallElements[k]; });
+    openaiCallsEmpty = true;
+    if (openaiModelCallsEl) {
+        openaiModelCallsEl.innerHTML = '<div class="openai-empty">模型请求/响应将显示在此处</div>';
+    }
+}
+
+function prettyJson(obj) {
+    try {
+        return JSON.stringify(obj, null, 2);
+    } catch (e) {
+        return String(obj);
+    }
+}
+
+function openAIMessageSummary(msg) {
+    if (!msg) return '';
+    if (msg.tool_calls && msg.tool_calls.length) {
+        var names = msg.tool_calls.map(function (tc) {
+            if (tc.function && tc.function.name) return tc.function.name;
+            return tc.name || 'tool';
+        });
+        return 'tool_calls: ' + names.join(', ');
+    }
+    if (msg.role === 'tool') {
+        var preview = (msg.content || '').replace(/\s+/g, ' ').slice(0, 80);
+        return 'tool_call_id=' + (msg.tool_call_id || '') + (preview ? ' · ' + preview : '');
+    }
+    var text = (msg.content == null ? '' : String(msg.content)).replace(/\s+/g, ' ').slice(0, 100);
+    return text || '(empty)';
+}
+
+function appendOpenAIMessage(msg) {
+    if (!openaiMessagesEl || !msg) return;
+    if (openaiMessagesEmpty) {
+        openaiMessagesEl.innerHTML = '';
+        openaiMessagesEmpty = false;
+    }
+
+    var card = document.createElement('div');
+    var hasTools = !!(msg.tool_calls && msg.tool_calls.length);
+    card.className = 'openai-msg-card' + (hasTools ? ' has-tools' : '');
+
+    var role = msg.role || 'unknown';
+    card.innerHTML =
+        '<div class="openai-msg-header">' +
+            '<span class="openai-role-badge ' + escapeHtml(role) + '">' + escapeHtml(role) + '</span>' +
+            '<span class="openai-msg-summary">' + escapeHtml(openAIMessageSummary(msg)) + '</span>' +
+            '<span class="openai-msg-arrow">▶</span>' +
+        '</div>' +
+        '<div class="openai-msg-body"><pre><code></code></pre></div>';
+
+    var body = card.querySelector('.openai-msg-body');
+    var code = body.querySelector('code');
+    code.textContent = prettyJson(msg);
+
+    var header = card.querySelector('.openai-msg-header');
+    var arrow = card.querySelector('.openai-msg-arrow');
+    header.addEventListener('click', function () {
+        var open = body.classList.toggle('open');
+        arrow.textContent = open ? '▼' : '▶';
+    });
+
+    // 有 tool_calls 或 tool 结果时默认展开
+    if (hasTools || role === 'tool') {
+        body.classList.add('open');
+        arrow.textContent = '▼';
+    }
+
+    openaiMessagesEl.appendChild(card);
+    openaiMessagesEl.scrollTop = openaiMessagesEl.scrollHeight;
+}
+
+function setOpenAIMessagesFromHistory(histMsgs) {
+    clearOpenAIInspector();
+    if (!histMsgs || !histMsgs.length) return;
+    for (var i = 0; i < histMsgs.length; i++) {
+        appendOpenAIMessage(histMsgs[i]);
+    }
+    // 历史回填后清空 Model Calls（仅保留 Messages）
+    clearOpenAIModelCalls();
+}
+
+function handleOpenAIModelRequest(data) {
+    if (!openaiModelCallsEl || !data) return;
+    if (openaiCallsEmpty) {
+        openaiModelCallsEl.innerHTML = '';
+        openaiCallsEmpty = false;
+    }
+
+    openaiCallIndex += 1;
+    var callId = data.callId || ('call-' + openaiCallIndex);
+    var card = document.createElement('div');
+    card.className = 'openai-call-card';
+    card.dataset.callId = callId;
+    card.innerHTML =
+        '<div class="openai-call-header">' +
+            '<span class="openai-call-index">Call ' + openaiCallIndex + '</span>' +
+            '<span class="openai-msg-summary">request → …</span>' +
+            '<span class="openai-call-finish"></span>' +
+            '<span class="openai-msg-arrow">▼</span>' +
+        '</div>' +
+        '<div class="openai-call-body open">' +
+            '<div class="openai-call-label">Request</div>' +
+            '<pre class="openai-call-request"><code></code></pre>' +
+            '<div class="openai-call-label">Chunks</div>' +
+            '<pre class="openai-call-chunks"><code></code></pre>' +
+            '<div class="openai-call-label">Response</div>' +
+            '<pre class="openai-call-response"><code>(streaming…)</code></pre>' +
+        '</div>';
+
+    var body = card.querySelector('.openai-call-body');
+    var arrow = card.querySelector('.openai-msg-arrow');
+    card.querySelector('.openai-call-header').addEventListener('click', function () {
+        var open = body.classList.toggle('open');
+        arrow.textContent = open ? '▼' : '▶';
+    });
+
+    card.querySelector('.openai-call-request code').textContent = prettyJson(data.request || {});
+
+    openaiModelCallsEl.appendChild(card);
+    openaiModelCallsEl.scrollTop = openaiModelCallsEl.scrollHeight;
+
+    openaiCallElements[callId] = {
+        card: card,
+        chunks: [],
+        chunksEl: card.querySelector('.openai-call-chunks code'),
+        responseEl: card.querySelector('.openai-call-response code'),
+        finishEl: card.querySelector('.openai-call-finish'),
+        summaryEl: card.querySelector('.openai-msg-summary'),
+    };
+}
+
+function handleOpenAIModelChunk(data) {
+    if (!data || !data.callId || !openaiCallElements[data.callId]) return;
+    var el = openaiCallElements[data.callId];
+    var chunk = data.chunk || null;
+    // 兼容旧载荷：choices[0].delta
+    if (!chunk && data.choices && data.choices[0]) {
+        chunk = {
+            object: 'chat.completion.chunk',
+            choices: data.choices,
+        };
+    }
+    if (!chunk) return;
+    el.chunks.push(chunk);
+    el.chunksEl.textContent = prettyJson(el.chunks);
+    if (openaiModelCallsEl) {
+        openaiModelCallsEl.scrollTop = openaiModelCallsEl.scrollHeight;
+    }
+}
+
+function handleOpenAIModelResponse(data) {
+    if (!data || !data.callId || !openaiCallElements[data.callId]) return;
+    var el = openaiCallElements[data.callId];
+    var response = data.response || null;
+    // 兼容旧载荷
+    if (!response && data.message) {
+        response = {
+            object: 'chat.completion',
+            choices: [{
+                index: 0,
+                message: data.message,
+                finish_reason: data.finish_reason || null,
+            }],
+        };
+    }
+    if (!response) return;
+
+    el.responseEl.textContent = prettyJson(response);
+
+    var finishReason = null;
+    var message = null;
+    if (response.choices && response.choices[0]) {
+        finishReason = response.choices[0].finish_reason;
+        message = response.choices[0].message;
+    }
+    el.finishEl.textContent = finishReason || '';
+
+    var summary = 'response';
+    if (finishReason === 'tool_calls') {
+        summary = 'tool_calls';
+    } else if (message && message.content) {
+        summary = String(message.content).replace(/\s+/g, ' ').slice(0, 60);
+    }
+    el.summaryEl.textContent = summary;
+    if (openaiModelCallsEl) {
+        openaiModelCallsEl.scrollTop = openaiModelCallsEl.scrollHeight;
+    }
+}
+
 // ==================== 会话回放：工具调用渲染辅助函数 ====================
 
+function normalizeToolCallForUI(tc) {
+    if (!tc) return { id: '', name: 'unknown', args: {} };
+    if (tc.function) {
+        var args = {};
+        try {
+            args = JSON.parse(tc.function.arguments || '{}');
+        } catch (e) {
+            args = { raw: tc.function.arguments };
+        }
+        return {
+            id: tc.id || '',
+            name: tc.function.name || 'unknown',
+            args: args,
+        };
+    }
+    return {
+        id: tc.id || '',
+        name: tc.name || 'unknown',
+        args: tc.args || {},
+    };
+}
+
 function createToolCallElement(tc) {
+    tc = normalizeToolCallForUI(tc);
     var tcContainer = document.createElement('div');
     tcContainer.className = 'tool-call';
     var argsJson = '';
@@ -637,12 +893,15 @@ async function switchSession(threadId) {
     chatMessages.innerHTML = '';
     var wEl = document.getElementById('welcomeScreen');
     if (wEl) wEl.remove();
+    clearOpenAIInspector();
 
     try {
         var res = await fetch('/api/sessions/' + threadId + '/messages');
         var payload = await res.json();
         var histMsgs = payload.data || [];
         var toolCallElements = {};
+
+        setOpenAIMessagesFromHistory(histMsgs);
 
         for (var i = 0; i < histMsgs.length; i++) {
             var msg = histMsgs[i];
@@ -654,15 +913,18 @@ async function switchSession(threadId) {
 
                 for (var j = 0; j < msg.tool_calls.length; j++) {
                     var tc = msg.tool_calls[j];
-                    var tcContainer = createToolCallElement(tc);
+                    var normalized = normalizeToolCallForUI(tc);
+                    var tcContainer = createToolCallElement(normalized);
                     lastToolRef.insertAdjacentElement('afterend', tcContainer);
                     lastToolRef = tcContainer;
-                    toolCallElements[tc.id] = tcContainer;
+                    toolCallElements[normalized.id] = tcContainer;
                 }
             } else if (msg.role === 'tool' && msg.tool_call_id && toolCallElements[msg.tool_call_id]) {
                 fillToolCallResult(toolCallElements[msg.tool_call_id], msg.content);
+            } else if (msg.role === 'tool' || msg.role === 'system') {
+                continue;
             } else {
-                appendMessage(msg.role, msg.content);
+                appendMessage(msg.role, msg.content || '');
             }
         }
         scrollToBottom();
@@ -681,6 +943,7 @@ async function deleteSession(threadId) {
             messages = [];
             chatMessages.innerHTML = '';
             chatMessages.appendChild(createWelcomeScreen());
+            clearOpenAIInspector();
         }
         renderSessionList();
     } catch(e) {

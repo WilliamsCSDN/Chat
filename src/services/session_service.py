@@ -8,7 +8,6 @@ import sqlite3
 from typing import Optional
 
 from openai import AsyncOpenAI
-from langchain_core.messages import AIMessage, ToolMessage
 
 from src.config.config_settings import SQLITE_DB_PATH
 
@@ -207,40 +206,12 @@ async def get_session_messages(thread_id: str) -> list[dict]:
         state = await checkpointer.aget(config)
         result = []
         if state and "channel_values" in state and "messages" in state["channel_values"]:
+            from src.services.openai_format import lc_message_to_openai
+
             for msg in state["channel_values"]["messages"]:
-                role_map = {"human": "user", "ai": "assistant", "system": "system", "tool": "tool"}
-                content = getattr(msg, "content", "") or ""
-                if isinstance(content, list):
-                    text_parts = []
-                    for part in content:
-                        if isinstance(part, dict) and part.get("type") == "text":
-                            text_parts.append(part.get("text", ""))
-                        elif isinstance(part, dict) and part.get("type") == "tool_use":
-                            pass
-                        elif isinstance(part, str):
-                            text_parts.append(part)
-                    content = "".join(text_parts)
-
-                entry = {
-                    "role": role_map.get(msg.type, "user") if hasattr(msg, "type") else "user",
-                    "content": content,
-                }
-
-                # AI messages: include tool_calls if present
-                if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
-                    entry["tool_calls"] = [
-                        {
-                            "id": (tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", "")),
-                            "name": (tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")),
-                            "args": (tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})),
-                        }
-                        for tc in msg.tool_calls
-                    ]
-                # Tool messages: include tool_call_id
-                if isinstance(msg, ToolMessage) and hasattr(msg, "tool_call_id") and msg.tool_call_id:
-                    entry["tool_call_id"] = msg.tool_call_id
-
-                result.append(entry)
+                entry = lc_message_to_openai(msg)
+                if entry is not None:
+                    result.append(entry)
         return result
     except Exception:
         logger.warning("获取会话消息失败 | thread_id=%s", thread_id, exc_info=True)

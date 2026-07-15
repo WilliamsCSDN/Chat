@@ -195,7 +195,13 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_
         agent = _get_agent(use_model)
 
         # 流式执行 agent，通过 agui 模块映射事件
-        async for sse_event in stream_agui_events(agent, langchain_messages, thread_id):
+        async for sse_event in stream_agui_events(
+            agent,
+            langchain_messages,
+            thread_id,
+            model=use_model,
+            tools=TOOLS_SCHEMA,
+        ):
             yield sse_event
 
         total_cost_ms = (time.perf_counter() - started_at) * 1000
