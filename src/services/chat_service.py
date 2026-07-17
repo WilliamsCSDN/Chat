@@ -30,6 +30,7 @@ from src.middleware.skill_load_guard import prevent_duplicate_skill_load
 from src.tools.rag_tool import retrieve_knowledge
 from src.tools.skills import skills_load, load_skills_for_context
 from src.tools.weather_tool import get_wether
+from src.tools.mcp_meta import mcp_list_tools, mcp_get_schema, mcp_call_tool
 from src.services.agui import (
     stream_agui_events,
     session_title,
@@ -41,7 +42,6 @@ from src.services.agui import (
 )
 from src.services.input_guard import *
 from src.config.config_settings import INPUT_GUARD_ENABLED
-from src.mcp import get_mcp_manager
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +95,15 @@ def _get_agent(model: str):
         from langchain_openai import ChatOpenAI
         from src.middleware.input_guard import InputGuardMiddleware
 
-        mcp = get_mcp_manager()
-        mcp_tools = mcp.get_tools() if mcp else []
-        tools = [get_wether, retrieve_knowledge, skills_load] + mcp_tools
+        # MCP 工具通过 meta-tool 惰性披露（避免全量 schema 注入上下文）
+        tools = [
+            get_wether,
+            retrieve_knowledge,
+            skills_load,
+            mcp_list_tools,
+            mcp_get_schema,
+            mcp_call_tool,
+        ]
 
         chat_model = ChatOpenAI(
             model=model,
@@ -145,7 +151,17 @@ async def chat_stream(messages: List[Dict[str, str]], model: str = None, thread_
     from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
     def _build_tools_schema():
-        agent_tools = _agent_tools_cache.get(use_model, [get_wether, retrieve_knowledge, skills_load])
+        agent_tools = _agent_tools_cache.get(
+            use_model,
+            [
+                get_wether,
+                retrieve_knowledge,
+                skills_load,
+                mcp_list_tools,
+                mcp_get_schema,
+                mcp_call_tool,
+            ],
+        )
         return [convert_to_openai_tool(t) for t in agent_tools]
 
     is_new_thread = thread_id is None

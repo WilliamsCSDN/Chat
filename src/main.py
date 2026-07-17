@@ -19,12 +19,14 @@ app = FastAPI(title="百炼大模型对话", version="1.0.0")
 @app.on_event("startup")
 async def startup_checkpointer():
     from src.services.session_service import init_checkpointer
-    from src.mcp import MCPManager, set_mcp_manager
+    from src.mcp_client import MCPManager, set_mcp_manager
     await init_checkpointer()
     mcp = MCPManager()
     mcp.load_config("mcp_config.json")
-    await mcp.discover_tools()
     set_mcp_manager(mcp)
+    # 并行 warmup：拉 instructions + 预热 tools_meta；
+    # 单个 server 失败不阻塞启动
+    await mcp.discover_all()
 
 
 # ── 静态文件 ──

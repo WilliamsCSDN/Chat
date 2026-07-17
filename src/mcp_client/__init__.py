@@ -1,6 +1,11 @@
-"""MCP 客户端模块 — 将 MCP 服务器工具接入 LangChain Agent。"""
+"""MCP 客户端模块 — 将 MCP 服务器工具接入 LangChain Agent。
 
-from src.mcp.manager import MCPManager
+目录命名为 `mcp_client` 而非 `mcp`，避免与 PyPI 官方 `mcp` SDK 命名冲突
+（否则某些启动路径下 `from mcp.client.session import ...` 会被误解析到本地包，
+触发循环 import）。
+"""
+
+from src.mcp_client.manager import MCPManager
 
 _mcp_manager: MCPManager | None = None
 
