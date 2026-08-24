@@ -1,0 +1,424 @@
+{
+  "metadata": {
+    "skill_name": "rag-categories",
+    "skill_path": "/Volumes/env/work/extra/Chat/src/skill/rag-categories",
+    "timestamp": "2026-07-17T15:00:00+08:00",
+    "evals_run": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "payment-failure",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '支付'",
+          "passed": true,
+          "evidence": "期望 category='支付'，实际观察到 category 参数值: ['支付']"
+        },
+        {
+          "text": "query 参数包含原始问题的核心语义",
+          "passed": true,
+          "evidence": "期望 query 含关键词之一 ['支付', '失败']，实际 query 列表: ['支付过程中失败了怎么解决处理']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "payment-failure",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6666666666666666,
+        "passed": 2,
+        "failed": 1,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '支付'",
+          "passed": false,
+          "evidence": "期望 category='支付'，实际观察到 category 参数值: ['payment']"
+        },
+        {
+          "text": "query 参数包含原始问题的核心语义",
+          "passed": true,
+          "evidence": "期望 query 含关键词之一 ['支付', '失败']，实际 query 列表: ['支付失败 解决方法 常见原因 排查步骤']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "merchant-onboarding-docs",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 2,
+        "failed": 0,
+        "total": 2,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '进件'",
+          "passed": true,
+          "evidence": "期望 category='进件'，实际观察到 category 参数值: ['进件']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "merchant-onboarding-docs",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.5,
+        "passed": 1,
+        "failed": 1,
+        "total": 2,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '进件'",
+          "passed": false,
+          "evidence": "期望 category='进件'，实际观察到 category 参数值: ['merchant_onboarding']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "commission-settlement-cycle",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 2,
+        "failed": 0,
+        "total": 2,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '分润'",
+          "passed": true,
+          "evidence": "期望 category='分润'，实际观察到 category 参数值: ['分润']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "commission-settlement-cycle",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.5,
+        "passed": 1,
+        "failed": 1,
+        "total": 2,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '分润'",
+          "passed": false,
+          "evidence": "期望 category='分润'，实际观察到 category 参数值: ['commission']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "cross-category-onboarding-and-profit",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "至少调用了 2 次 retrieve_knowledge",
+          "passed": true,
+          "evidence": "期望至少 2 次调用，实际 2 次"
+        },
+        {
+          "text": "调用中包含 category='进件'",
+          "passed": true,
+          "evidence": "期望有一次 category='进件'，实际 category 序列: ['分润', '进件']"
+        },
+        {
+          "text": "调用中包含 category='分润'",
+          "passed": true,
+          "evidence": "期望有一次 category='分润'，实际 category 序列: ['分润', '进件']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "cross-category-onboarding-and-profit",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "failed": 3,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "至少调用了 2 次 retrieve_knowledge",
+          "passed": false,
+          "evidence": "期望至少 2 次调用，实际 1 次"
+        },
+        {
+          "text": "调用中包含 category='进件'",
+          "passed": false,
+          "evidence": "期望有一次 category='进件'，实际 category 序列: ['profit_sharing']"
+        },
+        {
+          "text": "调用中包含 category='分润'",
+          "passed": false,
+          "evidence": "期望有一次 category='分润'，实际 category 序列: ['profit_sharing']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "off-topic-should-not-call",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "failed": 1,
+        "total": 1,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "不调用 retrieve_knowledge 函数",
+          "passed": false,
+          "evidence": "期望不调用，但发现 1 次调用: ['通用']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "off-topic-should-not-call",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "failed": 1,
+        "total": 1,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "不调用 retrieve_knowledge 函数",
+          "passed": false,
+          "evidence": "期望不调用，但发现 1 次调用: ['company_info']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "implicit-payment-not-received",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 2,
+        "failed": 0,
+        "total": 2,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '支付'",
+          "passed": true,
+          "evidence": "期望 category='支付'，实际观察到 category 参数值: ['支付']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "implicit-payment-not-received",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.5,
+        "passed": 1,
+        "failed": 1,
+        "total": 2,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "调用了 retrieve_knowledge 函数",
+          "passed": true,
+          "evidence": "共发现 1 次 retrieve_knowledge 调用"
+        },
+        {
+          "text": "category 参数的值等于 '支付'",
+          "passed": false,
+          "evidence": "期望 category='支付'，实际观察到 category 参数值: ['payments']"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 0.8333,
+        "stddev": 0.3727,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      },
+      "tokens": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.3611,
+        "stddev": 0.2621,
+        "min": 0.0,
+        "max": 0.6667
+      },
+      "time_seconds": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      },
+      "tokens": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.47",
+      "time_seconds": "n/a",
+      "tokens": "n/a"
+    }
+  },
+  "notes": []
+}

@@ -1,0 +1,7 @@
+{
+  "tool_calls": [
+    {"tool": "retrieve_knowledge", "arguments": {"query": "进件之后分润怎么分配", "category": "分润"}},
+    {"tool": "retrieve_knowledge", "arguments": {"query": "进件之后分润怎么分配", "category": "进件"}}
+  ],
+  "reasoning": "用户问题同时命中两个分类的触发关键词：'分润'、'分配'（利润分配）明确对应'分润'分类；'进件'明确对应'进件'分类。核心诉求是了解进件（商户入驻）完成后分润是如何分配的，跨越'进件→分润'两个领域。按照技能规则第 3 条，跨分类问题需要对每个相关分类分别调用 retrieve_knowledge，因此分别以 category='分润' 与 category='进件' 各调用一次。"
+}

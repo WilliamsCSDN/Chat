@@ -21,7 +21,7 @@ class Chunk:
 # 3. Milvus：建 Collection → 插入 → 建索引
 # ─────────────────────────────────────────────────────────
 COLLECTION = "xiyouji"
-DIM        = 384
+DIM        = 1024
 
 def init_milvus():
     from pymilvus import (

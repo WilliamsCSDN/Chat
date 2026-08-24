@@ -1,0 +1,10 @@
+{
+  "eval_id": 1,
+  "eval_name": "payment-failure",
+  "prompt": "我支付过程中失败了该怎么解决处理呢",
+  "assertions": [
+    "调用了 retrieve_knowledge 函数",
+    "category 参数的值等于 '支付'",
+    "query 参数包含原始问题的核心语义"
+  ]
+}

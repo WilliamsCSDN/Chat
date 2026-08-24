@@ -1,0 +1,25 @@
+{
+  "expectations": [
+    {
+      "text": "调用了 retrieve_knowledge 函数",
+      "passed": true,
+      "evidence": "共发现 1 次 retrieve_knowledge 调用"
+    },
+    {
+      "text": "category 参数的值等于 '支付'",
+      "passed": true,
+      "evidence": "期望 category='支付'，实际观察到 category 参数值: ['支付']"
+    },
+    {
+      "text": "query 参数包含原始问题的核心语义",
+      "passed": true,
+      "evidence": "期望 query 含关键词之一 ['支付', '失败']，实际 query 列表: ['支付失败的解决方法和处理流程']"
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 0,
+    "total": 3,
+    "pass_rate": 1.0
+  }
+}

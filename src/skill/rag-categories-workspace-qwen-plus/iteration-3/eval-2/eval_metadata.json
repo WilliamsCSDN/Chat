@@ -1,0 +1,9 @@
+{
+  "eval_id": 2,
+  "eval_name": "merchant-onboarding-docs",
+  "prompt": "商户入驻的资料要提交哪些",
+  "assertions": [
+    "调用了 retrieve_knowledge 函数",
+    "category 参数的值等于 '进件'"
+  ]
+}

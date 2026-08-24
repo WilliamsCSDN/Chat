@@ -9,7 +9,10 @@ DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen3.5-plus")
 
 # 百炼 OpenAI 兼容模式的 base_url
-DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+DASHSCOPE_BASE_URL = os.getenv(
+    "DASHSCOPE_BASE_URL",
+    "https://dashscope.aliyuncs.com/compatible-mode/v1",
+)
 
 
 def _get_bool(name: str, default: bool) -> bool:
@@ -68,7 +71,7 @@ RAG_DIRECT_ANSWER_MARGIN = float(os.getenv("RAG_DIRECT_ANSWER_MARGIN", "0.10"))
 RAG_DIRECT_ANSWER_INCLUDE_SOURCE = _get_bool("RAG_DIRECT_ANSWER_INCLUDE_SOURCE", True)
 MILVUS_EMBEDDING_MODEL = os.getenv(
     "MILVUS_EMBEDDING_MODEL",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "text-embedding-v4",
 )
 MILVUS_EMBEDDING_MODEL_PATH = os.getenv(
     "MILVUS_EMBEDDING_MODEL_PATH",

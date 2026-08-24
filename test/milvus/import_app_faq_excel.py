@@ -13,7 +13,7 @@ import load_embedding
 
 DEFAULT_EXCEL_PATH = Path(__file__).resolve().parent / "app_faq_1000.xlsx"
 DEFAULT_COLLECTION = "app_faq"
-DEFAULT_DIM = 384
+DEFAULT_DIM = 1024
 DEFAULT_BATCH_SIZE = 200
 
 

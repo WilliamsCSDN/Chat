@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "佣金结算周期是多久",
+        "category": "分润"
+      }
+    }
+  ],
+  "reasoning": "(no reasoning text; model went straight to tool call)"
+}

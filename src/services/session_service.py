@@ -98,7 +98,7 @@ async def generate_and_save_title(thread_id: str, user_message: str) -> str:
     client = _get_title_client()
     try:
         resp = await client.chat.completions.create(
-            model="qwen-flash",
+            model="qwen3.5-plus",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=30,

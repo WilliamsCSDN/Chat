@@ -4,12 +4,12 @@
 流程：
   1. 默认加载 xiyouji.txt（不存在时回退内置节选）
   2. 按章节 + 滑动窗口切分
-  3. 用 sentence-transformers 生成中文向量
+  3. 用阿里云 DashScope text-embedding-v4 生成中文向量
   4. 写入 Milvus，建索引
   5. 语义检索演示
 
 依赖：
-  pip install pymilvus sentence-transformers
+  pip install pymilvus openai
 
 Milvus 启动（docker）：
   docker run -d --name milvus-standalone \
@@ -265,7 +265,7 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
 # 3. Milvus：建 Collection → 插入 → 建索引
 # ─────────────────────────────────────────────────────────
 COLLECTION = "xiyouji"
-DIM        = 384
+DIM        = 1024
 
 def init_milvus():
     from pymilvus import (
@@ -488,7 +488,7 @@ def main():
 
     # Step 2 向量化
     print("=" * 56)
-    print("  Step 2  生成向量（sentence-transformers）")
+    print("  Step 2  生成向量（DashScope text-embedding-v4）")
     print("=" * 56)
     embeddings = embed_texts([c.text for c in chunks])
     print(f"✅ 向量维度: {len(embeddings[0])}，共 {len(embeddings)} 条\n")

@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "佣金结算周期是多久",
+        "category": "commission"
+      }
+    }
+  ],
+  "reasoning": "用户询问的是佣金结算周期，属于平台/业务政策类问题，答案通常写在内部知识库的“佣金/结算/财务规则”条目里，且各平台规则可能不同（T+1、周结、月结等），不宜凭常识回答。因此调用 retrieve_knowledge 查询知识库，category 选择 commission（佣金/结算相关分类），query 直接使用用户原问题以保留语义。"
+}

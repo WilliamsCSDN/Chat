@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "商户入驻需要提交的资料清单",
+        "category": "merchant_onboarding"
+      }
+    }
+  ],
+  "reasoning": "用户询问商户入驻的资料提交要求,这是一个平台/业务侧的具体政策与流程问题,不同平台(电商、支付、外卖、O2O等)要求差异较大,且资料清单会随监管与平台规则更新。为给出准确、贴合当前业务的清单,应先调用内部知识库检索『商户入驻资料』相关内容,再结合检索结果作答;类别选择 merchant_onboarding 以定向命中入驻/资质文档。"
+}

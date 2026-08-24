@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "公司上班时间",
+        "category": "通用"
+      }
+    }
+  ],
+  "reasoning": "您好，关于公司上班时间，这属于通用行政类信息。我来帮您查询一下："
+}

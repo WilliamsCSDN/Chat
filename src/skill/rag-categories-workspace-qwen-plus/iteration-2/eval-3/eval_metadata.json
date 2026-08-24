@@ -1,0 +1,9 @@
+{
+  "eval_id": 3,
+  "eval_name": "commission-settlement-cycle",
+  "prompt": "佣金结算周期是多久",
+  "assertions": [
+    "调用了 retrieve_knowledge 函数",
+    "category 参数的值等于 '分润'"
+  ]
+}

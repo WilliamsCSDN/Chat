@@ -1,0 +1,10 @@
+{
+  "eval_id": 4,
+  "eval_name": "cross-category-onboarding-and-profit",
+  "prompt": "我进件之后,分润怎么分配?",
+  "assertions": [
+    "至少调用了 2 次 retrieve_knowledge",
+    "调用中包含 category='进件'",
+    "调用中包含 category='分润'"
+  ]
+}

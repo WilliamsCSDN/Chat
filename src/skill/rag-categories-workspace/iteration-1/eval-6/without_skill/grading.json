@@ -1,0 +1,20 @@
+{
+  "expectations": [
+    {
+      "text": "调用了 retrieve_knowledge 函数",
+      "passed": true,
+      "evidence": "共发现 1 次 retrieve_knowledge 调用"
+    },
+    {
+      "text": "category 参数的值等于 '支付'",
+      "passed": false,
+      "evidence": "期望 category='支付'，实际观察到 category 参数值: ['payments']"
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 1,
+    "total": 2,
+    "pass_rate": 0.5
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "tool_calls": [
+    {"tool": "retrieve_knowledge", "arguments": {"query": "公司上班时间", "category": "通用"}}
+  ],
+  "reasoning": "用户询问『你们公司几点上班』，是关于公司作息/办公时间的常识性问题，不涉及支付、分润、进件三个业务领域的任何关键词。根据 SKILL.md 的第 4 条规则，无法匹配任何业务分类时，使用 category=\"通用\" 进行全库检索。"
+}

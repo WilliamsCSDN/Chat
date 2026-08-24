@@ -1,0 +1,6 @@
+{
+  "tool_calls": [
+    {"tool": "retrieve_knowledge", "arguments": {"query": "我的钱怎么还没到账啊", "category": "支付"}}
+  ],
+  "reasoning": "用户询问『钱怎么还没到账』，核心关键词为『到账』，直接命中『支付』分类的触发关键词列表（支付、退款、到账、扣款……），因此使用 category=\"支付\" 调用 retrieve_knowledge 检索到账时间、支付流程、交易流水等相关内部知识。"
+}

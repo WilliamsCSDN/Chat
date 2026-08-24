@@ -1,0 +1,9 @@
+{
+  "eval_id": 6,
+  "eval_name": "implicit-payment-not-received",
+  "prompt": "我的钱怎么还没到账啊",
+  "assertions": [
+    "调用了 retrieve_knowledge 函数",
+    "category 参数的值等于 '支付'"
+  ]
+}

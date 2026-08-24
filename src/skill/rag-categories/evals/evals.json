@@ -1,0 +1,60 @@
+{
+  "skill_name": "rag-categories",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我支付过程中失败了该怎么解决处理呢",
+      "expected_output": "调用 retrieve_knowledge,category='支付',query 保留用户原始问题",
+      "expectations": [
+        "调用了 retrieve_knowledge 函数",
+        "category 参数的值等于 '支付'",
+        "query 参数包含原始问题的核心语义"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "商户入驻的资料要提交哪些",
+      "expected_output": "调用 retrieve_knowledge,category='进件'",
+      "expectations": [
+        "调用了 retrieve_knowledge 函数",
+        "category 参数的值等于 '进件'"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "佣金结算周期是多久",
+      "expected_output": "调用 retrieve_knowledge,category='分润'",
+      "expectations": [
+        "调用了 retrieve_knowledge 函数",
+        "category 参数的值等于 '分润'"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "我进件之后,分润怎么分配?",
+      "expected_output": "跨分类:分别调用 retrieve_knowledge(category='进件') 和 retrieve_knowledge(category='分润')",
+      "expectations": [
+        "至少调用了 2 次 retrieve_knowledge",
+        "调用中包含 category='进件'",
+        "调用中包含 category='分润'"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "你们公司几点上班",
+      "expected_output": "无法匹配任何分类,不会调用retrieve_knowledge工具",
+      "expectations": [
+        "不调用 retrieve_knowledge 函数"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "我的钱怎么还没到账啊",
+      "expected_output": "隐晦表达『到账』触发支付分类",
+      "expectations": [
+        "调用了 retrieve_knowledge 函数",
+        "category 参数的值等于 '支付'"
+      ]
+    }
+  ]
+}

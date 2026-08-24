@@ -1,0 +1,6 @@
+{
+  "tool_calls": [
+    {"tool": "retrieve_knowledge", "arguments": {"query": "支付过程中失败了怎么解决处理", "category": "支付"}}
+  ],
+  "reasoning": "用户问题的核心主题是‘支付过程中失败’，直接命中‘支付’分类的触发关键词（支付、支付失败），属于支付异常处理场景，因此调用 retrieve_knowledge 并传入 category=\"支付\"，让 Milvus 过滤表达式 category_l1 == \"支付\" 精准限定检索范围。问题未涉及分润、进件等其他领域，无需跨分类检索。"
+}

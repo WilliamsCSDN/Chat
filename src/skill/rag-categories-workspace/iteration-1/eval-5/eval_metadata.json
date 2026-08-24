@@ -1,0 +1,8 @@
+{
+  "eval_id": 5,
+  "eval_name": "off-topic-should-not-call",
+  "prompt": "你们公司几点上班",
+  "assertions": [
+    "不调用 retrieve_knowledge 函数"
+  ]
+}

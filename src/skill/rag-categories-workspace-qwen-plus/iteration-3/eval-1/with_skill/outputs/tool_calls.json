@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "支付失败的解决方法和处理流程",
+        "category": "支付"
+      }
+    }
+  ],
+  "reasoning": "(no reasoning text; model went straight to tool call)"
+}

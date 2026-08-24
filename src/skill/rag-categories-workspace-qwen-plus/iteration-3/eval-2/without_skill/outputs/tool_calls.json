@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "商户入驻需要提交哪些资料",
+        "category": "进件"
+      }
+    }
+  ],
+  "reasoning": "(no reasoning text; model went straight to tool call)"
+}

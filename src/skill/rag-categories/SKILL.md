@@ -36,4 +36,4 @@ description: 当用户问题涉及支付、分润、进件领域时，调用此�
 1. 分析用户问题中的核心主题，与各分类的关键词进行匹配。
 2. 如果匹配到某一分类，使用该分类的 `category` 参数调用 `retrieve_knowledge`。
 3. 如果问题跨越多个分类，分别对每个相关分类调用 `retrieve_knowledge`。
-4. 如果无法匹配任何分类，使用 `category="通用"` 进行全库检索。
+4. 如果无法匹配任何分类，不要调用`retrieve_knowledge`工具。

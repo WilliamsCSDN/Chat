@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "公司上班时间",
+        "category": "通用"
+      }
+    }
+  ],
+  "reasoning": "该问题不属于支付、分润或进件领域，无法匹配到指定分类，将使用通用检索："
+}

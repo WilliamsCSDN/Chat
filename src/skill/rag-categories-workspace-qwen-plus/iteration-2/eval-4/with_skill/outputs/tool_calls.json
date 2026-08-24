@@ -1,0 +1,19 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "进件完成后分润如何分配",
+        "category": "进件"
+      }
+    },
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "进件完成后分润如何分配",
+        "category": "分润"
+      }
+    }
+  ],
+  "reasoning": "用户问题同时涉及“进件”和“分润”两个领域：  \n- “我进件之后” → 属于**进件**分类（关键词：进件、入驻、资质审核等）  \n- “分润怎么分配” → 属于**分润**分类（关键词：分润、分账、利润分配等）\n\n因此需分别调用 `retrieve_knowledge` 进行双路径检索，以获取进件流程与分润规则的关联信息。"
+}

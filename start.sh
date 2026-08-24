@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PORT="${PORT:-8000}"
+PORT="${PORT:-8001}"
 HOST="${HOST:-0.0.0.0}"
 ACTION="${1:-start}"
 

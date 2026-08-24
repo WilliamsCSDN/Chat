@@ -8,7 +8,6 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple
 
 from src.config.config_settings import (
@@ -32,6 +31,7 @@ from src.config.config_settings import (
     MILVUS_VECTOR_FIELD,
     RAG_LOG_PREVIEW_CHARS,
 )
+from src.services.embedding_client import embed_query
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +274,6 @@ class MilvusRetriever:
         self.search_expr = search_expr
         self.alias = alias
 
-        self._model = None
         self._collection = None
         self._connected = False
         self._disabled = False
@@ -283,27 +282,9 @@ class MilvusRetriever:
         self._sparse_avgdl: float = 0.0
         self._sparse_ready = False
 
-    def _resolve_model_path(self) -> Path:
-        configured = Path(self.embedding_model_path)
-        if configured.is_absolute():
-            return configured
-        project_root = Path(__file__).resolve().parent.parent
-        return project_root / configured
-
-    def _get_model(self):
-        if self._model is not None:
-            return self._model
-
-        from sentence_transformers import SentenceTransformer
-
-        model_path = self._resolve_model_path()
-        if model_path.exists():
-            logger.info("使用本地 embedding 模型: %s", model_path)
-            self._model = SentenceTransformer(str(model_path))
-        else:
-            logger.info("使用在线 embedding 模型: %s", self.embedding_model_name)
-            self._model = SentenceTransformer(self.embedding_model_name)
-        return self._model
+    def _embed_query(self, query: str) -> List[float]:
+        logger.info("使用 DashScope embedding 模型: %s", self.embedding_model_name)
+        return embed_query(query)
 
     def _get_collection(self):
         if self._collection is not None:
@@ -506,11 +487,18 @@ class MilvusRetriever:
             expr or self.search_expr or "<empty>",
         )
         try:
-            model = self._get_model()
-            vector = model.encode([query], normalize_embeddings=True)[0]
-            if hasattr(vector, "tolist"):
-                vector = vector.tolist()
+            vector = self._embed_query(query)
+        except Exception as exc:
+            cost_ms = (time.perf_counter() - start) * 1000
+            logger.warning(
+                "DashScope embedding 调用失败，本次 RAG 跳过 | query=%s | 耗时=%.2fms | err=%s",
+                query,
+                cost_ms,
+                exc,
+            )
+            return []
 
+        try:
             collection = self._get_collection()
             collection.load()
             output_fields = self._get_output_fields(collection)

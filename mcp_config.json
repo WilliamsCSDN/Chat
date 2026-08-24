@@ -1,0 +1,21 @@
+
+{
+  "mcpServers": {
+
+    "RollingGo-Hotel": {
+      "url": "https://mcp.rollinggo.cn/mcp",
+      "headers": {
+        "Authorization": "Bearer mcp_050483fe22334072a3f04b93fbce86e8"
+      },
+      "description": "查询酒店的服务"
+    },
+    "RollingGo-Flight": {
+      "url": "https://mcp.rollinggo.cn/mcp/flight",
+      "headers": {
+        "Authorization": "Bearer mcp_050483fe22334072a3f04b93fbce86e8"
+      },
+      "description": "查询机票、航班、航线的服务"
+    }
+
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "tool_calls": [
+    {"tool": "retrieve_knowledge", "arguments": {"query": "商户入驻需要提交哪些资料", "category": "进件"}}
+  ],
+  "reasoning": "用户问题的核心是『商户入驻』和『资料提交』，直接命中『进件』分类的触发关键词（入驻、资料提交、商户注册、资质审核），因此只需针对『进件』分类调用一次 retrieve_knowledge，无需跨分类检索。"
+}

@@ -1,0 +1,15 @@
+{
+  "expectations": [
+    {
+      "text": "不调用 retrieve_knowledge 函数",
+      "passed": true,
+      "evidence": "未调用 retrieve_knowledge，符合预期"
+    }
+  ],
+  "summary": {
+    "passed": 1,
+    "failed": 0,
+    "total": 1,
+    "pass_rate": 1.0
+  }
+}

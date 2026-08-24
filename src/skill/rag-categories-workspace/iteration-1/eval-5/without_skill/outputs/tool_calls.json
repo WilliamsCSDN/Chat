@@ -1,0 +1,12 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "公司上班时间 工作时间 作息时间",
+        "category": "company_info"
+      }
+    }
+  ],
+  "reasoning": "用户询问公司具体的上班时间,这属于公司内部的规章制度/HR 信息,不是通用常识,模型无法凭空知道。因此需要调用 retrieve_knowledge 查询公司知识库中的 company_info(公司信息/规章制度)类别,以获得准确的作息时间后再回答用户。"
+}

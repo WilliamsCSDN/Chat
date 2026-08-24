@@ -1,0 +1,25 @@
+{
+  "expectations": [
+    {
+      "text": "至少调用了 2 次 retrieve_knowledge",
+      "passed": true,
+      "evidence": "期望至少 2 次调用，实际 2 次"
+    },
+    {
+      "text": "调用中包含 category='进件'",
+      "passed": true,
+      "evidence": "期望有一次 category='进件'，实际 category 序列: ['进件', '分润']"
+    },
+    {
+      "text": "调用中包含 category='分润'",
+      "passed": true,
+      "evidence": "期望有一次 category='分润'，实际 category 序列: ['进件', '分润']"
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 0,
+    "total": 3,
+    "pass_rate": 1.0
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "tool_calls": [
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "进件后分润分配规则",
+        "category": "分润"
+      }
+    },
+    {
+      "tool": "retrieve_knowledge",
+      "arguments": {
+        "query": "进件流程及后续步骤",
+        "category": "进件"
+      }
+    }
+  ],
+  "reasoning": "(no reasoning text; model went straight to tool call)"
+}

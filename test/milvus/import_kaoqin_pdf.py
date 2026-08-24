@@ -18,7 +18,7 @@ except Exception:  # pragma: no cover - 由 collect_pdf_pages 在运行时抛出
 
 DEFAULT_PDF_PATH = Path(__file__).resolve().parent / "kaoqin.pdf"
 DEFAULT_COLLECTION = "kaoqin_pdf"
-DEFAULT_DIM = 384
+DEFAULT_DIM = 1024
 DEFAULT_BATCH_SIZE = 128
 DEFAULT_MAX_SENTENCES = 6
 
